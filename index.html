@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ryan Simmon's Glade Runner 2</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; background: white; border: 5px solid black; }
+        #menu, #playerSelect, #endMenu, #pauseMenu {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        #startButton, #player1Button, #player2Button, #player3Button {
+            display: block;
+            margin: 20px auto;
+            padding: 20px;
+            font-size: 24px;
+        }
+        #playerSelect div {
+            display: inline-block;
+            margin: 0 20px;
+        }
+        #playerSelect img {
+            width: 100px;
+            height: 100px;
+        }
+        #timer {
+            text-align: center;
+            font-size: 24px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <img id="titleImage" src="title-screen.png" alt="Title Screen">
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="playerSelect">
+        <div>
+            <img id="ryanRight" src="ryan-right.png" alt="Ryan">
+            <button id="player1Button">Ryan</button>
+        </div>
+        <div>
+            <img id="alexRight" src="alex-right.png" alt="Alex">
+            <button id="player2Button">Alex</button>
+        </div>
+        <div>
+            <img id="mitchRight" src="mitch-right.png" alt="Mitch">
+            <button id="player3Button">Mitch</button>
+        </div>
+    </div>
+    <div id="pauseMenu">
+        <button id="pauseButton">Pause</button>
+    </div>
+    <div id="endMenu">
+        <p id="timeTaken"></p>
+        <button id="restartButton">Restart Game</button>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="timer">Time: 0 seconds</div>
+
+    <!-- Add audio element for background music -->
+    <audio id="backgroundMusic" loop>
+        <source src="background-music.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script src="script.js"></script>
+</body>
+</html>

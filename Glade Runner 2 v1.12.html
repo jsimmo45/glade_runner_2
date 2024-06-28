@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ryan Simmon's Glade Runner 2</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; background: white; border: 5px solid black; }
+        #menu, #playerSelect, #endMenu, #pauseMenu {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        #startButton, #player1Button, #player2Button, #player3Button {
+            display: block;
+            margin: 20px auto;
+            padding: 20px;
+            font-size: 24px;
+        }
+        #playerSelect div {
+            display: inline-block;
+            margin: 0 20px;
+        }
+        #playerSelect img {
+            width: 100px;
+            height: 100px;
+        }
+        #timer {
+            text-align: center;
+            font-size: 24px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <img id="titleImage" src="C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/title-screen.png" alt="Title Screen">
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="playerSelect">
+        <div>
+            <img id="ryanRight" src="C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/ryan-right.png" alt="Ryan">
+            <button id="player1Button">Ryan</button>
+        </div>
+        <div>
+            <img id="alexRight" src="C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/alex-right.png" alt="Alex">
+            <button id="player2Button">Alex</button>
+        </div>
+        <div>
+            <img id="mitchRight" src="C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/mitch-right.png" alt="Mitch">
+            <button id="player3Button">Mitch</button>
+        </div>
+    </div>
+    <div id="pauseMenu">
+        <button id="pauseButton">Pause</button>
+    </div>
+    <div id="endMenu">
+        <p id="timeTaken"></p>
+        <button id="restartButton">Restart Game</button>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="timer">Time: 0 seconds</div>
+
+    <!-- Add audio element for background music -->
+    <audio id="backgroundMusic" loop>
+        <source src="C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/background-music.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const backgroundMusic = document.getElementById('backgroundMusic');
+
+        const skierImages = {
+            ryan: {
+                left: new Image(),
+                right: new Image(),
+                forward: new Image()
+            },
+            alex: {
+                left: new Image(),
+                right: new Image(),
+                forward: new Image()
+            },
+            mitch: {
+                left: new Image(),
+                right: new Image(),
+                forward: new Image()
+            }
+        };
+
+        skierImages.ryan.left.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/ryan-left.png';
+        skierImages.ryan.right.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/ryan-right.png';
+        skierImages.ryan.forward.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/ryan-forward.png';
+
+        skierImages.alex.left.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/alex-left.png';
+        skierImages.alex.right.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/alex-right.png';
+        skierImages.alex.forward.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/alex-forward.png';
+
+        skierImages.mitch.left.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/mitch-left.png';
+        skierImages.mitch.right.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/mitch-right.png';
+        skierImages.mitch.forward.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/mitch-forward.png';
+
+        const treeImage = new Image();
+        treeImage.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/tree.png';
+
+        const murderTreeImage = new Image();
+        murderTreeImage.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/murder-tree.png';
+
+        let selectedSkier = skierImages.ryan;
+
+        const skier = {
+            x: canvas.width / 2 - 20,
+            y: 100,  // Start near the top center
+            width: 40,
+            height: 80,
+            speed: 6,  // Increased speed
+            direction: 'forward'
+        };
+
+        const murderTree = {
+            x: Math.random() * canvas.width,
+            y: canvas.height + 100,  // Start off-screen at the bottom
+            width: 45, // 1.5 times bigger
+            height: 75, // 1.5 times bigger
+            speed: 1.5, // Adjusted speed to follow skier
+            active: false
+        };
+
+        const snowmanImages = {
+            intact: new Image(),
+            hit: new Image()
+        };
+
+        snowmanImages.intact.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/snowman-intact.png';
+        snowmanImages.hit.src = 'C:/Users/james/Desktop/codes/Glade_Runner_2_-_Murder_Tree/snowman-hit.png';
+
+        const snowmen = [];
+        const numSnowmen = 3;
+        for (let i = 0; i < numSnowmen; i++) {
+            snowmen.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height * 10,
+                width: 40,
+                height: 60,
+                hit: false
+            });
+        }
+
+        let speedBoostActive = false;
+        let speedBoostEndTime = 0;
+
+        const trees = [];
+        const numTrees = 20;
+
+        const finishLine = {
+            y: -10 * canvas.height,
+            width: canvas.width,
+            height: 40,
+            color: 'black',
+            pattern: 'checkerboard'
+        };
+
+        const gameState = {
+            distance: 0,
+            gameOver: false,
+            win: false,
+            startTime: 0,
+            elapsedTime: 0,
+            paused: false,
+            pauseTime: 0,
+        };
+
+        for (let i = 0; i < numTrees; i++) {
+            trees.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height * 10,
+                width: 60,  // Twice as big
+                height: 100 // Twice as big
+            });
+        }
+
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false,
+            ArrowDown: false
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = true;
+            } else if (e.key === 'p') {
+                togglePause();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = false;
+            }
+        });
+
+        function updateSkierPosition() {
+            if (keys.ArrowLeft) {
+                skier.x -= skier.speed;
+                skier.direction = 'left';
+                if (skier.x < 0) skier.x = 0;
+            }
+            if (keys.ArrowRight) {
+                skier.x += skier.speed;
+                skier.direction = 'right';
+                if (skier.x + skier.width > canvas.width) skier.x = canvas.width - skier.width;
+            }
+            if (keys.ArrowUp) {
+                skier.y -= skier.speed;
+                skier.direction = 'forward';
+                if (skier.y < 0) skier.y = 0;
+            }
+            if (keys.ArrowDown) {
+                skier.y += skier.speed;
+                skier.direction = 'forward';
+                if (skier.y + skier.height > canvas.height) skier.y = canvas.height - skier.height;
+            }
+        }
+
+        function drawSkier() {
+            let skierImage;
+            if (skier.direction === 'left') {
+                skierImage = selectedSkier.left;
+                ctx.drawImage(skierImage, skier.x, skier.y, skier.width * 1.5, skier.height * 1.5);
+            } else if (skier.direction === 'right') {
+                skierImage = selectedSkier.right;
+                ctx.drawImage(skierImage, skier.x, skier.y, skier.width * 1.5, skier.height * 1.5);
+            } else {
+                skierImage = selectedSkier.forward;
+                ctx.drawImage(skierImage, skier.x, skier.y, skier.width, skier.height);
+            }
+        }
+
+        function drawMurderTree() {
+            if (gameState.elapsedTime >= 10 && !murderTree.active) {
+                murderTree.active = true;
+                murderTree.y = canvas.height;
+            }
+            if (murderTree.active) {
+                ctx.drawImage(murderTreeImage, murderTree.x, murderTree.y, murderTree.width, murderTree.height);
+            }
+        }
+
+        function drawTree(tree) {
+            ctx.drawImage(treeImage, tree.x, tree.y, tree.width, tree.height);
+        }
+
+        function drawSnowman(snowman) {
+            const image = snowman.hit ? snowmanImages.hit : snowmanImages.intact;
+            ctx.drawImage(image, snowman.x, snowman.y, snowman.width, snowman.height);
+        }
+
+        function drawFinishLine() {
+            for (let i = 0; i < finishLine.width / 20; i++) {
+                for (let j = 0; j < finishLine.height / 20; j++) {
+                    ctx.fillStyle = (i + j) % 2 === 0 ? 'black' : 'white';
+                    ctx.fillRect(i * 20, finishLine.y + j * 20, 20, 20);
+                }
+            }
+        }
+
+        function drawProgressBar() {
+            const progress = Math.max(0, Math.min(1, gameState.distance / (10 * canvas.height)));
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, 10);
+            ctx.fillStyle = 'green';
+            ctx.fillRect(0, 0, progress * canvas.width, 10);
+        }
+
+        function updateGame() {
+            if (gameState.gameOver || gameState.win || gameState.paused) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updateSkierPosition();
+
+            // Scroll the background from bottom to top
+            finishLine.y -= skier.speed / 2;
+            for (let tree of trees) {
+                tree.y -= skier.speed / 2;
+                if (tree.y < -tree.height) {
+                    tree.y = canvas.height + Math.random() * canvas.height * 9;
+                    tree.x = Math.random() * canvas.width;
+                }
+            }
+
+            for (let snowman of snowmen) {
+                snowman.y -= skier.speed / 2;
+                if (snowman.y < -snowman.height) {
+                    snowman.y = canvas.height + Math.random() * canvas.height * 9;
+                    snowman.x = Math.random() * canvas.width;
+                }
+            }
+
+            if (murderTree.active) {
+                murderTree.y -= skier.speed / 2;
+                const dx = skier.x - murderTree.x;
+                const dy = skier.y - murderTree.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const moveX = (dx / distance) * murderTree.speed;
+                const moveY = (dy / distance) * murderTree.speed;
+                murderTree.x += moveX;
+                murderTree.y += moveY;
+                murderTree.x = Math.max(0, Math.min(murderTree.x, canvas.width - murderTree.width));
+                murderTree.y = Math.max(0, Math.min(murderTree.y, canvas.height - murderTree.height));
+            }
+
+            gameState.distance += skier.speed;
+
+            gameState.elapsedTime = Math.floor((Date.now() - gameState.startTime - gameState.pauseTime) / 1000);
+            document.getElementById('timer').textContent = `Time: ${gameState.elapsedTime} seconds`;
+
+            if (skier.y < finishLine.y + finishLine.height) {
+                gameState.win = true;
+                showEndMenu();
+                return;
+            }
+
+            for (let tree of trees) {
+                if (
+                    skier.x < tree.x + tree.width &&
+                    skier.x + skier.width > tree.x &&
+                    skier.y < tree.y + tree.height &&
+                    skier.height + skier.y > tree.y
+                ) {
+                    gameState.gameOver = true;
+                    showEndMenu();
+                    return;
+                }
+
+                drawTree(tree);
+            }
+
+            if (
+                skier.x < murderTree.x + murderTree.width &&
+                skier.x + skier.width > murderTree.x &&
+                skier.y < murderTree.y + murderTree.height &&
+                skier.height + skier.y > murderTree.y
+            ) {
+                gameState.gameOver = true;
+                document.getElementById('endMenu').style.display = 'block';
+                document.getElementById('timeTaken').textContent = 'The Murder Tree gets another one!';
+                return;
+            }
+
+            for (let snowman of snowmen) {
+                if (!snowman.hit &&
+                    skier.x < snowman.x + snowman.width &&
+                    skier.x + skier.width > snowman.x &&
+                    skier.y < snowman.y + snowman.height &&
+                    skier.height + skier.y > snowman.y) {
+
+                    snowman.hit = true;
+                    speedBoostActive = true;
+                    skier.speed *= 1.33;
+                    speedBoostEndTime = Date.now() + 3000; // 3 seconds boost
+                }
+
+                drawSnowman(snowman);
+            }
+
+            if (speedBoostActive) {
+                if (Date.now() > speedBoostEndTime) {
+                    skier.speed /= 1.33;
+                    speedBoostActive = false;
+                } else {
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('Speed boost', skier.x, skier.y - 10);
+                }
+            }
+
+            drawMurderTree();
+            drawSkier();
+            drawFinishLine();
+            drawProgressBar();
+
+            requestAnimationFrame(updateGame);
+        }
+
+        function showEndMenu() {
+            document.getElementById('endMenu').style.display = 'block';
+            document.getElementById('timeTaken').textContent = `Time Taken: ${gameState.elapsedTime} seconds`;
+        }
+
+        function startGame() {
+            console.log("Starting game...");
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('playerSelect').style.display = 'block';
+        }
+
+        function selectPlayer(player) {
+            console.log("Selected player:", player);
+            selectedSkier = skierImages[player];
+            document.getElementById('playerSelect').style.display = 'none';
+            document.getElementById('pauseMenu').style.display = 'block';
+            canvas.style.display = 'block';
+            gameState.startTime = Date.now();
+            gameState.paused = false;
+            backgroundMusic.play(); // Play background music when the game starts
+            updateGame();
+        }
+
+        function restartGame() {
+            location.reload();
+        }
+
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+            if (gameState.paused) {
+                backgroundMusic.pause(); // Pause music when game is paused
+                gameState.pauseStart = Date.now();
+            } else {
+                backgroundMusic.play(); // Resume music when game is unpaused
+                gameState.pauseTime += Date.now() - gameState.pauseStart;
+                updateGame();
+            }
+        }
+
+        document.getElementById('startButton').addEventListener('click', startGame);
+        document.getElementById('player1Button').addEventListener('click', () => selectPlayer('ryan'));
+        document.getElementById('player2Button').addEventListener('click', () => selectPlayer('alex'));
+        document.getElementById('player3Button').addEventListener('click', () => selectPlayer('mitch'));
+        document.getElementById('pauseButton').addEventListener('click', togglePause);
+        document.getElementById('restartButton').addEventListener('click', restartGame);
+
+        document.getElementById('menu').style.display = 'block';
+        canvas.style.display = 'none';
+    </script>
+</body>
+</html>
