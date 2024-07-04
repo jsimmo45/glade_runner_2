@@ -3,14 +3,25 @@
 <head>
     <title>Ryan Simmons' Glade Runner 2</title>
     <style>
-        body { margin: 0; }
-        canvas { display: block; background: white; border: 5px solid black; }
-        #menu, #playerSelect, #endMenu, #pauseMenu {
+        body { 
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        canvas { 
+            display: block; 
+            background: white; 
+            border: 5px solid black; 
+        }
+        #menu, #playerSelect, #endMenu, #pauseMenu, #stageMenu {
             display: none;
             text-align: center;
             margin-top: 20px;
         }
-        #startButton, #player1Button, #player2Button, #player3Button {
+        #startButton, #stage2Button, #player1Button, #player2Button, #player3Button {
             display: block;
             margin: 20px auto;
             padding: 20px;
@@ -24,7 +35,7 @@
             width: 100px;
             height: 100px;
         }
-        #timer {
+        #timer, #highScores {
             text-align: center;
             font-size: 24px;
             margin-top: 10px;
@@ -35,6 +46,7 @@
     <div id="menu">
         <img id="titleImage" src="title-screen.png" alt="Title Screen">
         <button id="startButton">Start Game</button>
+        <button id="stage2Button">Stage 2</button>
     </div>
     <div id="playerSelect">
         <div>
@@ -55,6 +67,7 @@
     </div>
     <div id="endMenu">
         <p id="timeTaken"></p>
+        <p id="highScores"></p>
         <button id="restartButton">Restart Game</button>
     </div>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
@@ -108,6 +121,7 @@
         murderTreeImage.src = 'murder-tree.png';
 
         let selectedSkier = skierImages.ryan;
+        let isStage2 = false;
 
         const skier = {
             x: canvas.width / 2 - 20,
@@ -123,7 +137,7 @@
             y: canvas.height + 100,  // Start off-screen at the bottom
             width: 45, // 1.5 times bigger
             height: 75, // 1.5 times bigger
-            speed: 1.5, // Adjusted speed to follow skier
+            speed: 1.725, // Adjusted speed to follow skier
             active: false
         };
 
@@ -174,7 +188,7 @@
         for (let i = 0; i < numTrees; i++) {
             trees.push({
                 x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height * 10,
+                y: Math.random() * canvas.height * 10 + canvas.height,
                 width: 60,  // Twice as big
                 height: 100 // Twice as big
             });
@@ -319,6 +333,7 @@
 
             if (skier.y < finishLine.y + finishLine.height) {
                 gameState.win = true;
+                saveHighScore(gameState.elapsedTime);
                 showEndMenu();
                 return;
             }
@@ -350,7 +365,8 @@
                 return;
             }
 
-            for (let snowman of snowmen) {
+            for (let i = 0; i < snowmen.length; i++) {
+                const snowman = snowmen[i];
                 if (!snowman.hit &&
                     skier.x < snowman.x + snowman.width &&
                     skier.x + skier.width > snowman.x &&
@@ -361,6 +377,7 @@
                     speedBoostActive = true;
                     skier.speed *= 1.33;
                     speedBoostEndTime = Date.now() + 3000; // 3 seconds boost
+                    snowmen.splice(i, 1); // Remove hit snowman
                 }
 
                 drawSnowman(snowman);
@@ -388,12 +405,18 @@
         function showEndMenu() {
             document.getElementById('endMenu').style.display = 'block';
             document.getElementById('timeTaken').textContent = `Time Taken: ${gameState.elapsedTime} seconds`;
+            displayHighScores();
         }
 
         function startGame() {
             console.log("Starting game...");
             document.getElementById('menu').style.display = 'none';
             document.getElementById('playerSelect').style.display = 'block';
+        }
+
+        function startStage2() {
+            isStage2 = true;
+            startGame();
         }
 
         function selectPlayer(player) {
@@ -405,7 +428,24 @@
             gameState.startTime = Date.now();
             gameState.paused = false;
             backgroundMusic.play(); // Play background music when the game starts
+            if (isStage2) {
+                setupStage2();
+            }
             updateGame();
+        }
+
+        function setupStage2() {
+            trees.length = 0;
+            for (let i = 0; i < 10; i++) {
+                for (let j = 0; j < canvas.width / 60 - 1; j++) {
+                    trees.push({
+                        x: j * 60 + (j % 2 === 0 ? 60 : 0),
+                        y: canvas.height * i,
+                        width: 60,
+                        height: 100
+                    });
+                }
+            }
         }
 
         function restartGame() {
@@ -424,7 +464,23 @@
             }
         }
 
+        function saveHighScore(time) {
+            const highScores = JSON.parse(localStorage.getItem('highScores')) || [];
+            const playerName = prompt("Enter your name for the high score:");
+            highScores.push({ name: playerName, time: time });
+            highScores.sort((a, b) => a.time - b.time);
+            highScores.splice(5); // Keep only top 5 scores
+            localStorage.setItem('highScores', JSON.stringify(highScores));
+        }
+
+        function displayHighScores() {
+            const highScores = JSON.parse(localStorage.getItem('highScores')) || [];
+            const highScoresElement = document.getElementById('highScores');
+            highScoresElement.innerHTML = 'High Scores:<br>' + highScores.map(score => `${score.name}: ${score.time}s`).join('<br>');
+        }
+
         document.getElementById('startButton').addEventListener('click', startGame);
+        document.getElementById('stage2Button').addEventListener('click', startStage2);
         document.getElementById('player1Button').addEventListener('click', () => selectPlayer('ryan'));
         document.getElementById('player2Button').addEventListener('click', () => selectPlayer('alex'));
         document.getElementById('player3Button').addEventListener('click', () => selectPlayer('mitch'));
