@@ -3,7 +3,7 @@
 <head>
     <title>Ryan Simmons' Glade Runner 2</title>
     <style>
-        body { 
+        body {
             margin: 0;
             display: flex;
             justify-content: center;
@@ -11,10 +11,10 @@
             height: 100vh;
             background-color: #f0f0f0;
         }
-        canvas { 
-            display: block; 
-            background: white; 
-            border: 5px solid black; 
+        canvas {
+            display: block;
+            background: white;
+            border: 5px solid black;
         }
         #menu, #playerSelect, #endMenu, #pauseMenu, #stageMenu {
             display: none;
@@ -168,7 +168,7 @@
         const numTrees = 20;
 
         const finishLine = {
-            y: -10 * canvas.height,
+            y: -6 * canvas.height, // Shorter Stage 1
             width: canvas.width,
             height: 40,
             color: 'black',
@@ -281,7 +281,7 @@
         }
 
         function drawProgressBar() {
-            const progress = Math.max(0, Math.min(1, gameState.distance / (10 * canvas.height)));
+            const progress = Math.max(0, Math.min(1, gameState.distance / (finishLine.y + canvas.height)));
             ctx.fillStyle = 'black';
             ctx.fillRect(0, 0, canvas.width, 10);
             ctx.fillStyle = 'green';
@@ -305,12 +305,26 @@
                 }
             }
 
-            for (let snowman of snowmen) {
+            for (let i = snowmen.length - 1; i >= 0; i--) {
+                const snowman = snowmen[i];
                 snowman.y -= skier.speed / 2;
                 if (snowman.y < -snowman.height) {
-                    snowman.y = canvas.height + Math.random() * canvas.height * 9;
-                    snowman.x = Math.random() * canvas.width;
+                    snowmen.splice(i, 1); // Remove off-screen snowmen
+                    continue;
                 }
+                if (!snowman.hit &&
+                    skier.x < snowman.x + snowman.width &&
+                    skier.x + skier.width > snowman.x &&
+                    skier.y < snowman.y + snowman.height &&
+                    skier.height + skier.y > snowman.y) {
+
+                    snowman.hit = true;
+                    speedBoostActive = true;
+                    skier.speed *= 1.33;
+                    speedBoostEndTime = Date.now() + 3000; // 3 seconds boost
+                }
+
+                drawSnowman(snowman);
             }
 
             if (murderTree.active) {
@@ -363,24 +377,6 @@
                 document.getElementById('endMenu').style.display = 'block';
                 document.getElementById('timeTaken').textContent = 'The Murder Tree gets another one!';
                 return;
-            }
-
-            for (let i = 0; i < snowmen.length; i++) {
-                const snowman = snowmen[i];
-                if (!snowman.hit &&
-                    skier.x < snowman.x + snowman.width &&
-                    skier.x + skier.width > snowman.x &&
-                    skier.y < snowman.y + snowman.height &&
-                    skier.height + skier.y > snowman.y) {
-
-                    snowman.hit = true;
-                    speedBoostActive = true;
-                    skier.speed *= 1.33;
-                    speedBoostEndTime = Date.now() + 3000; // 3 seconds boost
-                    snowmen.splice(i, 1); // Remove hit snowman
-                }
-
-                drawSnowman(snowman);
             }
 
             if (speedBoostActive) {
@@ -437,13 +433,16 @@
         function setupStage2() {
             trees.length = 0;
             for (let i = 0; i < 10; i++) {
-                for (let j = 0; j < canvas.width / 60 - 1; j++) {
-                    trees.push({
-                        x: j * 60 + (j % 2 === 0 ? 60 : 0),
-                        y: canvas.height * i,
-                        width: 60,
-                        height: 100
-                    });
+                const gapIndex = Math.floor(Math.random() * (canvas.width / 60 - 1));
+                for (let j = 0; j < canvas.width / 60; j++) {
+                    if (j !== gapIndex && j !== gapIndex + 1) { // Create a gap in the tree line
+                        trees.push({
+                            x: j * 60,
+                            y: canvas.height * i,
+                            width: 60,
+                            height: 100
+                        });
+                    }
                 }
             }
         }
