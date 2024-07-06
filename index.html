@@ -73,16 +73,29 @@
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div id="timer">Time: 0 seconds</div>
 
-    <!-- Add audio element for background music -->
-    <audio id="backgroundMusic" loop>
-        <source src="background-music.mp3" type="audio/mpeg">
+    <!-- Add audio elements for background music -->
+    <audio id="titleMusic" loop>
+        <source src="Escape_the_Murder_Tree.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    <audio id="stage1Music" loop>
+        <source src="Murder_Tree_Behind_You.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    <audio id="stage2Music" loop>
+        <source src="Murder_Tree_Breakdown.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
     </audio>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const backgroundMusic = document.getElementById('backgroundMusic');
+        const titleMusic = document.getElementById('titleMusic');
+        const stage1Music = document.getElementById('stage1Music');
+        const stage2Music = document.getElementById('stage2Music');
+        
+        // Play title music on load
+        titleMusic.play();
 
         const skierImages = {
             ryan: {
@@ -126,8 +139,8 @@
         const skier = {
             x: canvas.width / 2 - 20,
             y: 100,  // Start near the top center
-            width: 40,
-            height: 80,
+            width: 30,
+            height: 60,
             speed: 6,  // Increased speed
             direction: 'forward'
         };
@@ -137,7 +150,7 @@
             y: canvas.height + 100,  // Start off-screen at the bottom
             width: 45, // 1.5 times bigger
             height: 75, // 1.5 times bigger
-            speed: 1.725, // Adjusted speed to follow skier
+            speed: 4.8, // 80% of skier's speed
             active: false
         };
 
@@ -168,7 +181,7 @@
         const numTrees = 20;
 
         const finishLine = {
-            y: -6 * canvas.height, // Shorter Stage 1
+            y: -10 * canvas.height, // 10 screens length
             width: canvas.width,
             height: 40,
             color: 'black',
@@ -190,7 +203,7 @@
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height * 10 + canvas.height,
                 width: 60,  // Twice as big
-                height: 100 // Twice as big
+                height: 80 // Reduced height
             });
         }
 
@@ -347,7 +360,7 @@
 
             if (skier.y < finishLine.y + finishLine.height) {
                 gameState.win = true;
-                saveHighScore(gameState.elapsedTime);
+                saveHighScore(gameState.elapsedTime, gameState.distance, selectedSkier);
                 showEndMenu();
                 return;
             }
@@ -406,12 +419,17 @@
 
         function startGame() {
             console.log("Starting game...");
+            titleMusic.pause();
+            stage1Music.play();
             document.getElementById('menu').style.display = 'none';
             document.getElementById('playerSelect').style.display = 'block';
         }
 
         function startStage2() {
+            console.log("Starting stage 2...");
             isStage2 = true;
+            titleMusic.pause();
+            stage2Music.play();
             startGame();
         }
 
@@ -423,7 +441,6 @@
             canvas.style.display = 'block';
             gameState.startTime = Date.now();
             gameState.paused = false;
-            backgroundMusic.play(); // Play background music when the game starts
             if (isStage2) {
                 setupStage2();
             }
@@ -454,28 +471,36 @@
         function togglePause() {
             gameState.paused = !gameState.paused;
             if (gameState.paused) {
-                backgroundMusic.pause(); // Pause music when game is paused
+                if (isStage2) {
+                    stage2Music.pause();
+                } else {
+                    stage1Music.pause();
+                }
                 gameState.pauseStart = Date.now();
             } else {
-                backgroundMusic.play(); // Resume music when game is unpaused
+                if (isStage2) {
+                    stage2Music.play();
+                } else {
+                    stage1Music.play();
+                }
                 gameState.pauseTime += Date.now() - gameState.pauseStart;
                 updateGame();
             }
         }
 
-        function saveHighScore(time) {
+        function saveHighScore(time, distance, skier) {
             const highScores = JSON.parse(localStorage.getItem('highScores')) || [];
             const playerName = prompt("Enter your name for the high score:");
-            highScores.push({ name: playerName, time: time });
+            highScores.push({ name: playerName, time: time, distance: Math.floor(distance * 0.02), skier: skier });
             highScores.sort((a, b) => a.time - b.time);
-            highScores.splice(5); // Keep only top 5 scores
+            highScores.splice(10); // Keep only top 10 scores
             localStorage.setItem('highScores', JSON.stringify(highScores));
         }
 
         function displayHighScores() {
             const highScores = JSON.parse(localStorage.getItem('highScores')) || [];
             const highScoresElement = document.getElementById('highScores');
-            highScoresElement.innerHTML = 'High Scores:<br>' + highScores.map(score => `${score.name}: ${score.time}s`).join('<br>');
+            highScoresElement.innerHTML = 'High Scores:<br>' + highScores.map(score => `${score.name}: ${score.time}s, ${score.distance}m, ${score.skier}`).join('<br>');
         }
 
         document.getElementById('startButton').addEventListener('click', startGame);
