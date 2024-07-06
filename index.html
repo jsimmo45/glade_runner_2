@@ -10,18 +10,19 @@
             align-items: center;
             height: 100vh;
             background-color: #f0f0f0;
+            flex-direction: column;
         }
         canvas {
             display: block;
             background: white;
             border: 5px solid black;
         }
-        #menu, #playerSelect, #endMenu, #pauseMenu, #stageMenu, #introMovie {
+        #menu, #playerSelect, #endMenu, #pauseMenu, #startScreen, #introMovie {
             display: none;
             text-align: center;
             margin-top: 20px;
         }
-        #startButton, #stage2Button, #introButton, #player1Button, #player2Button, #player3Button {
+        #startButton, #stage1Button, #stage2Button, #replayMovieButton, #player1Button, #player2Button, #player3Button {
             display: block;
             margin: 20px auto;
             padding: 20px;
@@ -43,11 +44,15 @@
     </style>
 </head>
 <body>
+    <div id="startScreen">
+        <button id="initialStartButton">Start Game</button>
+        <button id="viewMovieButton">View Movie</button>
+    </div>
     <div id="menu">
         <img id="titleImage" src="title-screen.png" alt="Title Screen">
-        <button id="startButton">Start Game</button>
+        <button id="stage1Button">Stage 1</button>
         <button id="stage2Button">Stage 2</button>
-        <button id="introButton">Intro Movie</button>
+        <button id="replayMovieButton">Replay Intro Movie</button>
     </div>
     <div id="playerSelect">
         <div>
@@ -68,6 +73,7 @@
     </div>
     <div id="endMenu">
         <p id="timeTaken"></p>
+        <img id="endImage" src="" alt="End Image">
         <button id="restartButton">Restart Game</button>
     </div>
     <div id="introMovie">
@@ -140,6 +146,12 @@
         const murderTreeImage = new Image();
         murderTreeImage.src = 'murder-tree.png';
 
+        const endImages = {
+            tree: 'hit-tree.jpg',
+            murderTree: 'murder-tree-caught.jpg',
+            finish: 'stage-finished.jpg'
+        };
+
         let selectedSkier = skierImages.ryan;
         let isStage2 = false;
 
@@ -157,7 +169,7 @@
             y: canvas.height + 100,  // Start off-screen at the bottom
             width: 45, // 1.5 times bigger
             height: 75, // 1.5 times bigger
-            speed: 3.6, // 60% of skier's speed
+            speed: 3, // 50% of skier's speed
             active: false
         };
 
@@ -359,7 +371,7 @@
 
             if (skier.y < finishLine.y + finishLine.height) {
                 gameState.win = true;
-                showEndMenu();
+                showEndMenu(endImages.finish);
                 return;
             }
 
@@ -371,7 +383,7 @@
                     skier.height + skier.y > tree.y
                 ) {
                     gameState.gameOver = true;
-                    showEndMenu();
+                    showEndMenu(endImages.tree);
                     return;
                 }
 
@@ -385,7 +397,7 @@
                 skier.height + skier.y > murderTree.y
             ) {
                 gameState.gameOver = true;
-                document.getElementById('endMenu').style.display = 'block';
+                showEndMenu(endImages.murderTree);
                 document.getElementById('timeTaken').textContent = 'The Murder Tree gets another one!';
                 return;
             }
@@ -408,7 +420,8 @@
             requestAnimationFrame(updateGame);
         }
 
-        function showEndMenu() {
+        function showEndMenu(imageSrc) {
+            document.getElementById('endImage').src = imageSrc;
             document.getElementById('endMenu').style.display = 'block';
             document.getElementById('timeTaken').textContent = `Time Taken: ${gameState.elapsedTime} seconds`;
         }
@@ -487,21 +500,33 @@
 
         function showIntroMovie() {
             console.log("Showing intro movie...");
-            document.getElementById('menu').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'none';
             document.getElementById('introMovie').style.display = 'block';
             titleMusic.play();
+            introVideo.play();
         }
 
+        introVideo.addEventListener('ended', () => {
+            document.getElementById('introMovie').style.display = 'none';
+            document.getElementById('menu').style.display = 'block';
+        });
+
+        document.getElementById('initialStartButton').addEventListener('click', () => {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('menu').style.display = 'block';
+        });
+        document.getElementById('viewMovieButton').addEventListener('click', showIntroMovie);
         document.getElementById('startButton').addEventListener('click', startGame);
+        document.getElementById('stage1Button').addEventListener('click', startGame);
         document.getElementById('stage2Button').addEventListener('click', startStage2);
-        document.getElementById('introButton').addEventListener('click', showIntroMovie);
+        document.getElementById('replayMovieButton').addEventListener('click', showIntroMovie);
         document.getElementById('player1Button').addEventListener('click', () => selectPlayer('ryan'));
         document.getElementById('player2Button').addEventListener('click', () => selectPlayer('alex'));
         document.getElementById('player3Button').addEventListener('click', () => selectPlayer('mitch'));
         document.getElementById('pauseButton').addEventListener('click', togglePause);
         document.getElementById('restartButton').addEventListener('click', restartGame);
 
-        document.getElementById('menu').style.display = 'block';
+        document.getElementById('startScreen').style.display = 'block';
         canvas.style.display = 'none';
     </script>
 </body>
