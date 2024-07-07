@@ -17,7 +17,7 @@
             background: white;
             border: 5px solid black;
         }
-        #menu, #playerSelect, #endMenu, #pauseMenu, #startScreen, #introMovie {
+        #menu, #playerSelect, #endMenu, #pauseMenu, #introMovie {
             display: none;
             text-align: center;
             margin-top: 20px;
@@ -44,15 +44,11 @@
     </style>
 </head>
 <body>
-    <div id="startScreen">
-        <button id="initialStartButton">Start Game</button>
-        <button id="viewMovieButton">View Movie</button>
-    </div>
     <div id="menu">
         <img id="titleImage" src="title-screen.png" alt="Title Screen">
+        <button id="viewMovieButton">View Intro Movie</button>
         <button id="stage1Button">Stage 1</button>
         <button id="stage2Button">Stage 2</button>
-        <button id="replayMovieButton">Replay Intro Movie</button>
     </div>
     <div id="playerSelect">
         <div>
@@ -440,7 +436,8 @@
             titleMusic.pause();
             stage1Music.pause(); // Ensure stage 1 music stops
             stage2Music.play();
-            startGame();
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('playerSelect').style.display = 'block';
         }
 
         function selectPlayer(player) {
@@ -500,7 +497,7 @@
 
         function showIntroMovie() {
             console.log("Showing intro movie...");
-            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('menu').style.display = 'none';
             document.getElementById('introMovie').style.display = 'block';
             titleMusic.play();
             introVideo.play();
@@ -511,22 +508,16 @@
             document.getElementById('menu').style.display = 'block';
         });
 
-        document.getElementById('initialStartButton').addEventListener('click', () => {
-            document.getElementById('startScreen').style.display = 'none';
-            document.getElementById('menu').style.display = 'block';
-        });
         document.getElementById('viewMovieButton').addEventListener('click', showIntroMovie);
-        document.getElementById('startButton').addEventListener('click', startGame);
         document.getElementById('stage1Button').addEventListener('click', startGame);
         document.getElementById('stage2Button').addEventListener('click', startStage2);
-        document.getElementById('replayMovieButton').addEventListener('click', showIntroMovie);
         document.getElementById('player1Button').addEventListener('click', () => selectPlayer('ryan'));
         document.getElementById('player2Button').addEventListener('click', () => selectPlayer('alex'));
         document.getElementById('player3Button').addEventListener('click', () => selectPlayer('mitch'));
         document.getElementById('pauseButton').addEventListener('click', togglePause);
         document.getElementById('restartButton').addEventListener('click', restartGame);
 
-        document.getElementById('startScreen').style.display = 'block';
+        document.getElementById('menu').style.display = 'block';
         canvas.style.display = 'none';
     </script>
 </body>
