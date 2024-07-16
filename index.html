@@ -22,7 +22,7 @@
             text-align: center;
             margin-top: 20px;
         }
-        #startButton, #stage1Button, #stage2Button, #replayMovieButton, #player1Button, #player2Button, #player3Button {
+        #startButton, #stage1Button, #stage2Button, #stage3Button, #replayMovieButton, #player1Button, #player2Button, #player3Button {
             display: block;
             margin: 20px auto;
             padding: 20px;
@@ -49,6 +49,7 @@
         <button id="viewMovieButton">View Intro Movie</button>
         <button id="stage1Button">Stage 1</button>
         <button id="stage2Button">Stage 2</button>
+        <button id="stage3Button">Stage 3</button>
     </div>
     <div id="playerSelect">
         <div>
@@ -94,6 +95,10 @@
         <source src="Murder_Tree_Breakdown.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
     </audio>
+    <audio id="stage3Music" loop>
+        <source src="stage3-music.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -101,6 +106,7 @@
         const titleMusic = document.getElementById('titleMusic');
         const stage1Music = document.getElementById('stage1Music');
         const stage2Music = document.getElementById('stage2Music');
+        const stage3Music = document.getElementById('stage3Music');
         const introVideo = document.getElementById('introVideo');
 
         // Play title music on load
@@ -150,6 +156,7 @@
 
         let selectedSkier = skierImages.ryan;
         let isStage2 = false;
+        let isStage3 = false;
 
         const skier = {
             x: canvas.width / 2 - 20,
@@ -165,7 +172,7 @@
             y: canvas.height + 100,  // Start off-screen at the bottom
             width: 45, // 1.5 times bigger
             height: 75, // 1.5 times bigger
-            speed: 4, // 67% of skier's speed
+            speed: 4.5, // 75% of skier's speed
             active: false
         };
 
@@ -283,7 +290,7 @@
         function drawMurderTree() {
             if (gameState.elapsedTime >= 10 && !murderTree.active) {
                 murderTree.active = true;
-                murderTree.y = canvas.height;
+                murderTree.y = isStage3 ? -murderTree.height : canvas.height;
             }
             if (murderTree.active) {
                 ctx.drawImage(murderTreeImage, murderTree.x, murderTree.y, murderTree.width, murderTree.height);
@@ -348,7 +355,7 @@
             }
 
             if (murderTree.active) {
-                murderTree.y -= skier.speed / 2;
+                murderTree.y += isStage3 ? skier.speed / 2 : -skier.speed / 2; // Move up in Stage 3, down otherwise
                 const dx = skier.x - murderTree.x;
                 const dy = skier.y - murderTree.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
@@ -420,6 +427,7 @@
             document.getElementById('endImage').src = imageSrc;
             document.getElementById('endMenu').style.display = 'block';
             document.getElementById('timeTaken').textContent = `Time Taken: ${gameState.elapsedTime} seconds`;
+            canvas.style.display = 'none';
         }
 
         function startGame() {
@@ -440,6 +448,16 @@
             document.getElementById('playerSelect').style.display = 'block';
         }
 
+        function startStage3() {
+            console.log("Starting stage 3...");
+            isStage3 = true;
+            titleMusic.pause();
+            stage1Music.pause(); // Ensure stage 1 music stops
+            stage3Music.play();
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('playerSelect').style.display = 'block';
+        }
+
         function selectPlayer(player) {
             console.log("Selected player:", player);
             selectedSkier = skierImages[player];
@@ -450,6 +468,8 @@
             gameState.paused = false;
             if (isStage2) {
                 setupStage2();
+            } else if (isStage3) {
+                setupStage3();
             }
             updateGame();
         }
@@ -471,6 +491,25 @@
             }
         }
 
+        function setupStage3() {
+            trees.length = 0;
+            let pathX = canvas.width / 2 - 2.5 * skier.width;
+            for (let i = 0; i < 10; i++) {
+                const curve = (Math.random() - 0.5) * 2 * skier.width; // Random curve
+                pathX = Math.max(0, Math.min(pathX + curve, canvas.width - 5 * skier.width));
+                for (let j = 0; j < canvas.width / 60; j++) {
+                    if (j * 60 < pathX || j * 60 > pathX + 5 * skier.width) { // Create a narrow path
+                        trees.push({
+                            x: j * 60,
+                            y: canvas.height * i,
+                            width: 60,
+                            height: 100
+                        });
+                    }
+                }
+            }
+        }
+
         function restartGame() {
             location.reload();
         }
@@ -480,6 +519,8 @@
             if (gameState.paused) {
                 if (isStage2) {
                     stage2Music.pause();
+                } else if (isStage3) {
+                    stage3Music.pause();
                 } else {
                     stage1Music.pause();
                 }
@@ -487,6 +528,8 @@
             } else {
                 if (isStage2) {
                     stage2Music.play();
+                } else if (isStage3) {
+                    stage3Music.play();
                 } else {
                     stage1Music.play();
                 }
@@ -511,6 +554,7 @@
         document.getElementById('viewMovieButton').addEventListener('click', showIntroMovie);
         document.getElementById('stage1Button').addEventListener('click', startGame);
         document.getElementById('stage2Button').addEventListener('click', startStage2);
+        document.getElementById('stage3Button').addEventListener('click', startStage3);
         document.getElementById('player1Button').addEventListener('click', () => selectPlayer('ryan'));
         document.getElementById('player2Button').addEventListener('click', () => selectPlayer('alex'));
         document.getElementById('player3Button').addEventListener('click', () => selectPlayer('mitch'));
