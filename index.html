@@ -11,7 +11,7 @@
       flex-direction: column;
       align-items: center;
     }
-    /* Make the canvas responsive */
+    /* The canvas will be resized via JavaScript */
     canvas {
       background: #fff;
       border: 5px solid #333;
@@ -80,12 +80,12 @@
     <br>
     <button id="viewMovieButton">View Intro Movie</button>
     <br>
-    <!-- Stage selection buttons -->
-    <button id="stage1Button">Stage 1</button>
-    <button id="stage2Button">Stage 2</button>
-    <button id="stage3Button">Stage 3</button>
-    <button id="stage4Button">Falling Boulders</button>
-    <button id="bunnyButton">Bunny Slope</button>
+    <!-- Stage selection buttons with new names -->
+    <button id="stage1Button">Forest Frenzy</button>
+    <button id="stage2Button">Winter Wonderland</button>
+    <button id="stage3Button">Mountain Madness</button>
+    <button id="stage4Button">Rockslide Rumble</button>
+    <button id="bunnyButton">Bunny Slope Blitz</button>
   </div>
   
   <!-- Character selection UI -->
@@ -131,7 +131,6 @@
     </video>
   </div>
   
-  <!-- The canvas will be resized via JavaScript -->
   <canvas id="gameCanvas" style="display:none;"></canvas>
   <div id="timer">Time: 0 seconds</div>
 
@@ -176,7 +175,7 @@
       WIN: 'win'
     };
 
-    // Stage IDs: 1-4 as before, 5 for Bunny Slope
+    // Stage IDs: 1-4 and 5 for Bunny Slope
     const STAGES = {
       STAGE1: 1,
       STAGE2: 2,
@@ -209,14 +208,41 @@
       });
     }
 
+    /* ---------------- New Falling Snow (for Stage 2) ---------------- */
+    class SnowFlake {
+      constructor(x, y, size, speed, drift) {
+        this.x = x;
+        this.y = y;
+        this.size = size;
+        this.speed = speed;
+        this.drift = drift;
+      }
+      update() {
+        this.y += this.speed;
+        this.x += this.drift;
+        if (this.y > canvas.height) {
+          this.y = -this.size;
+          this.x = Math.random() * canvas.width;
+        }
+        if (this.x > canvas.width) { this.x = 0; }
+        if (this.x < 0) { this.x = canvas.width; }
+      }
+      draw(ctx) {
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     /* ---------------- Entity Classes ---------------- */
     class Skier {
-      constructor(x, y, width, height, images) {
+      constructor(x, y, width, height, images, baseSpeed = 6) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
-        this.baseSpeed = 6;
+        this.baseSpeed = baseSpeed;
         this.speed = this.baseSpeed;
         this.direction = 'forward';
         this.images = images; // { left, right, forward }
@@ -328,7 +354,7 @@
       }
     }
 
-    // New obstacle for Stage 4: Boulder drawn with an image.
+    // Boulder drawn with an image (for Stage 4: Rockslide Rumble)
     class Boulder {
       constructor(x, y, radius, speed, image) {
         this.x = x;
@@ -351,7 +377,7 @@
       }
     }
 
-    // New object for Bunny Slope: a jump ramp.
+    // Jump ramp for Bunny Slope Blitz
     class Jump {
       constructor(x, y, width, height) {
         this.x = x;
@@ -381,7 +407,9 @@
         this.startTime = 0;
         this.elapsedTime = 0;
         this.distance = 0;
-        this.totalDistance = 10 * this.canvas.height; // for progress bar
+        // Default totalDistance: for most stages, 10 * canvas.height;
+        // For Bunny Slope Blitz, we will adjust it later.
+        this.totalDistance = 10 * this.canvas.height;
         this.keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
         this.collisionEffect = null; // for "BAM!" animation
         // Asset containers
@@ -392,7 +420,8 @@
         this.snowmen = [];
         this.boulders = [];  // for Stage 4
         this.murderTree = null;
-        this.jump = null;    // for Bunny Slope
+        this.jump = null;    // for Bunny Slope Blitz
+        this.snowflakes = []; // for falling snow in Stage 2
         // Finish line (checkerboard)
         this.finishLine = { y: -10 * this.canvas.height, width: this.canvas.width, height: 40 };
         // Audio references
@@ -445,22 +474,30 @@
       }
       initGameObjects(selectedPlayer) {
         console.log("Initializing game objects for player:", selectedPlayer);
-        // Create the skier
-        this.skier = new Skier(this.canvas.width/2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
-        // Reset progress and finish line
+        // Set skier speed based on canvas width.
+        let baseSpeed = Math.max(8, this.canvas.width / 80);
+        this.skier = new Skier(this.canvas.width / 2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer], baseSpeed);
+        // Reset progress and collision effect.
         this.distance = 0;
-        this.finishLine.y = -10 * this.canvas.height;
         this.collisionEffect = null;
-        // Create obstacles based on stage
+        // Set totalDistance and finishLine based on stage.
+        if (this.currentStage === STAGES.BUNNY) {
+          // Make Bunny Slope shorter.
+          this.totalDistance = 3 * this.canvas.height;
+          this.finishLine.y = -3 * this.canvas.height;
+        } else {
+          this.totalDistance = 10 * this.canvas.height;
+          this.finishLine.y = -10 * this.canvas.height;
+        }
+        // Create obstacles based on stage.
         if (this.currentStage === STAGES.STAGE1) {
-          // 20 random trees
+          // Forest Frenzy: 20 random trees.
           this.trees = [];
           for (let i = 0; i < 20; i++) {
             const treeX = Math.random() * (this.canvas.width - 60);
             const treeY = Math.random() * this.canvas.height * 10 + this.canvas.height;
             this.trees.push(new Tree(treeX, treeY, 60, 80, this.assets.tree, this.canvas.height));
           }
-          // Always include murder tree for Stage 1-3 & 4 (except Bunny)
           this.murderTree = new MurderTree(
             Math.random() * (this.canvas.width - 45),
             this.canvas.height + 100,
@@ -469,7 +506,7 @@
             this.canvas.width, this.canvas.height
           );
         } else if (this.currentStage === STAGES.STAGE2) {
-          // Rows of trees with gaps
+          // Winter Wonderland: Rows of trees with gaps.
           this.trees = [];
           const rows = 10;
           const cols = Math.floor(this.canvas.width / 60);
@@ -488,10 +525,20 @@
             this.assets.murderTree,
             this.canvas.width, this.canvas.height
           );
+          // Create falling snow for Stage 2.
+          this.snowflakes = [];
+          for (let i = 0; i < 50; i++) {
+            let x = Math.random() * this.canvas.width;
+            let y = Math.random() * this.canvas.height;
+            let size = Math.random() * 2 + 1;
+            let speed = Math.random() * 1 + 0.5;
+            let drift = Math.random() * 0.5 - 0.25;
+            this.snowflakes.push(new SnowFlake(x, y, size, speed, drift));
+          }
         } else if (this.currentStage === STAGES.STAGE3) {
-          // Curving narrow path
+          // Mountain Madness: Curving narrow path.
           this.trees = [];
-          let pathX = this.canvas.width/2 - 2.5 * this.skier.width;
+          let pathX = this.canvas.width / 2 - 2.5 * this.skier.width;
           const rows = 10;
           const cols = Math.floor(this.canvas.width / 60);
           for (let i = 0; i < rows; i++) {
@@ -511,11 +558,11 @@
             this.canvas.width, this.canvas.height
           );
         } else if (this.currentStage === STAGES.STAGE4) {
-          // Stage with falling boulders instead of trees
+          // Rockslide Rumble: Falling boulders instead of trees.
           this.boulders = [];
           for (let i = 0; i < 10; i++) {
             let boulderX = Math.random() * (this.canvas.width - 40) + 20;
-            let boulderY = Math.random() * -this.canvas.height; // start above
+            let boulderY = Math.random() * -this.canvas.height;
             this.boulders.push(new Boulder(boulderX, boulderY, 20, 2, this.assets.boulder));
           }
           this.murderTree = new MurderTree(
@@ -526,25 +573,22 @@
             this.canvas.width, this.canvas.height
           );
         } else if (this.currentStage === STAGES.BUNNY) {
-          // Bunny Slope: Only trees and a jump ramp at the end; no murder tree.
+          // Bunny Slope Blitz: Only trees and a jump ramp; no murder tree.
           this.trees = [];
-          // Create a few rows of trees
           const rows = 5;
           const cols = Math.floor(this.canvas.width / 60);
           for (let i = 0; i < rows; i++) {
             for (let j = 0; j < cols; j++) {
-              // Leave gaps for the "bunny" path
               if (j % 2 === 0) {
                 this.trees.push(new Tree(j * 60, this.canvas.height * i, 60, 100, this.assets.tree, this.canvas.height));
               }
             }
           }
-          // No murder tree in Bunny Slope
           this.murderTree = null;
-          // Place a jump ramp near the finish line (use finishLine.y + some offset)
-          this.jump = new Jump(this.canvas.width/2 - 50, this.finishLine.y + 50, 100, 20);
+          // Place a jump ramp near the finish line.
+          this.jump = new Jump(this.canvas.width / 2 - 50, this.finishLine.y + 50, 100, 20);
         }
-        // Create snowmen (present in all stages)
+        // Create snowmen (always present).
         this.snowmen = [];
         for (let i = 0; i < 3; i++) {
           const snowmanX = Math.random() * (this.canvas.width - 40);
@@ -570,11 +614,11 @@
         }
       }
       update() {
-        // Update skier and finish line
+        // Update skier and finish line.
         this.skier.update(this.keys, this.canvas.width, this.canvas.height);
         this.finishLine.y -= this.skier.speed / 2;
         this.distance += this.skier.speed;
-        // Update snowmen
+        // Update snowmen.
         for (let snowman of this.snowmen) {
           snowman.update(this.skier.speed / 2);
           if (!snowman.hit && checkCollision(this.skier, snowman)) {
@@ -583,7 +627,7 @@
             this.skier.activateBoost(3000);
           }
         }
-        // Update obstacles based on stage
+        // Update obstacles based on stage.
         if (this.currentStage !== STAGES.STAGE4 && this.currentStage !== STAGES.BUNNY) {
           for (let tree of this.trees) {
             tree.update(this.skier.speed / 2);
@@ -609,7 +653,6 @@
               return;
             }
           }
-          // Also update murder tree in Stage 4
           if (this.murderTree.active) {
             this.murderTree.update(this.skier, this.currentStage);
             if (checkCollision(this.skier, this.murderTree)) {
@@ -622,7 +665,6 @@
             }
           }
         } else if (this.currentStage === STAGES.BUNNY) {
-          // In Bunny Slope, update trees and the jump ramp.
           for (let tree of this.trees) {
             tree.update(this.skier.speed / 2);
             if (checkCollision(this.skier, tree)) {
@@ -634,16 +676,18 @@
               return;
             }
           }
-          // Check for collision with the jump ramp
           if (this.jump && checkCollision(this.skier, { x: this.jump.x, y: this.jump.y, width: this.jump.width, height: this.jump.height })) {
-            console.log("Jump ramp reached on Bunny Slope!");
-            // For Bunny Slope, reaching the jump counts as a win
+            console.log("Jump ramp reached on Bunny Slope Blitz!");
             showEndMenu(endImages.finish, this.elapsedTime);
             this.state = GAME_STATES.WIN;
             return;
           }
         }
-        // Update murder tree for stages (if applicable)
+        // Update falling snow for Stage 2.
+        if (this.currentStage === STAGES.STAGE2 && this.snowflakes) {
+          for (let flake of this.snowflakes) { flake.update(); }
+        }
+        // Update murder tree (if applicable).
         if (this.murderTree && this.murderTree.active) {
           this.murderTree.update(this.skier, this.currentStage);
           if (checkCollision(this.skier, this.murderTree)) {
@@ -655,14 +699,14 @@
             return;
           }
         }
-        // Activate murder tree after 10 seconds (for stages that have it)
+        // Activate murder tree after 10 seconds (for stages that have it).
         this.elapsedTime = Math.floor((Date.now() - this.startTime - this.pauseTime) / 1000);
         if (this.elapsedTime >= 10 && this.murderTree && !this.murderTree.active) {
           this.murderTree.active = true;
           this.murderTree.y = (this.currentStage === STAGES.STAGE3) ? -this.murderTree.height : this.canvas.height;
           console.log("Murder tree activated");
         }
-        // Win condition: skier passes finish line (for stages without jump)
+        // Win condition: skier passes finish line (for stages without jump).
         if (this.skier.y < this.finishLine.y + this.finishLine.height && this.currentStage !== STAGES.BUNNY) {
           console.log("Win condition reached");
           showEndMenu(endImages.finish, this.elapsedTime);
@@ -692,9 +736,13 @@
       drawScene() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.drawFinishLine();
-        // Draw snowmen first
+        // If Stage 2, draw falling snow first.
+        if (this.currentStage === STAGES.STAGE2 && this.snowflakes) {
+          for (let flake of this.snowflakes) { flake.draw(this.ctx); }
+        }
+        // Draw snowmen first.
         for (let snowman of this.snowmen) { snowman.draw(this.ctx); }
-        // Then obstacles: trees or (for Stage 4) boulders
+        // Then obstacles.
         if (this.currentStage !== STAGES.STAGE4 && this.currentStage !== STAGES.BUNNY) {
           for (let tree of this.trees) { tree.draw(this.ctx); }
         } else if (this.currentStage === STAGES.STAGE4) {
@@ -703,9 +751,9 @@
           for (let tree of this.trees) { tree.draw(this.ctx); }
           if (this.jump) { this.jump.draw(this.ctx); }
         }
-        // Draw murder tree if present
+        // Draw murder tree if present.
         if (this.murderTree && this.murderTree.active) { this.murderTree.draw(this.ctx); }
-        // Draw skier on top
+        // Draw skier on top.
         this.skier.draw(this.ctx);
         this.drawProgressBar();
         if (this.skier.boostActive) {
@@ -760,7 +808,7 @@
     function saveHighScore(stageKey, record) {
       let scores = getHighScores(stageKey);
       scores.push(record);
-      scores.sort((a, b) => a.time - b.time); // lower time is better
+      scores.sort((a, b) => a.time - b.time);
       if (scores.length > 10) { scores = scores.slice(0, 10); }
       localStorage.setItem('highScores_' + stageKey, JSON.stringify(scores));
     }
@@ -788,31 +836,31 @@
       document.getElementById('menu').style.display = 'block';
     });
     document.getElementById('stage1Button').addEventListener('click', () => {
-      console.log("Stage 1 button clicked");
+      console.log("Forest Frenzy button clicked");
       game.currentStage = STAGES.STAGE1;
       document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
     document.getElementById('stage2Button').addEventListener('click', () => {
-      console.log("Stage 2 button clicked");
+      console.log("Winter Wonderland button clicked");
       game.currentStage = STAGES.STAGE2;
       document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
     document.getElementById('stage3Button').addEventListener('click', () => {
-      console.log("Stage 3 button clicked");
+      console.log("Mountain Madness button clicked");
       game.currentStage = STAGES.STAGE3;
       document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
     document.getElementById('stage4Button').addEventListener('click', () => {
-      console.log("Stage 4 button clicked");
+      console.log("Rockslide Rumble button clicked");
       game.currentStage = STAGES.STAGE4;
       document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
     document.getElementById('bunnyButton').addEventListener('click', () => {
-      console.log("Bunny Slope button clicked");
+      console.log("Bunny Slope Blitz button clicked");
       game.currentStage = STAGES.BUNNY;
       document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
@@ -846,19 +894,22 @@
       console.log("Restart button clicked");
       location.reload();
     });
-    // High score submission and view
+    // High score submission and view.
     document.getElementById('submitScoreButton').addEventListener('click', () => {
       const name = document.getElementById('playerName').value || "Anonymous";
-      const record = { name: name, skier: game.skier.images === game.assets.skier.ryan ? "Ryan" : 
-                                        (game.skier.images === game.assets.skier.alex ? "Alex" : "Mitch"),
-                                        time: game.elapsedTime };
+      const record = {
+        name: name,
+        skier: game.skier.images === game.assets.skier.ryan ? "Ryan" :
+               (game.skier.images === game.assets.skier.alex ? "Alex" : "Mitch"),
+        time: game.elapsedTime
+      };
       let stageKey;
       switch(game.currentStage) {
-        case STAGES.STAGE1: stageKey = "STAGE1"; break;
-        case STAGES.STAGE2: stageKey = "STAGE2"; break;
-        case STAGES.STAGE3: stageKey = "STAGE3"; break;
-        case STAGES.STAGE4: stageKey = "STAGE4"; break;
-        case STAGES.BUNNY: stageKey = "BUNNY"; break;
+        case STAGES.STAGE1: stageKey = "ForestFrenzy"; break;
+        case STAGES.STAGE2: stageKey = "WinterWonderland"; break;
+        case STAGES.STAGE3: stageKey = "MountainMadness"; break;
+        case STAGES.STAGE4: stageKey = "RockslideRumble"; break;
+        case STAGES.BUNNY: stageKey = "BunnySlopeBlitz"; break;
       }
       saveHighScore(stageKey, record);
       displayHighScores(stageKey);
@@ -866,11 +917,11 @@
     document.getElementById('viewHighScoresButton').addEventListener('click', () => {
       let stageKey;
       switch(game.currentStage) {
-        case STAGES.STAGE1: stageKey = "STAGE1"; break;
-        case STAGES.STAGE2: stageKey = "STAGE2"; break;
-        case STAGES.STAGE3: stageKey = "STAGE3"; break;
-        case STAGES.STAGE4: stageKey = "STAGE4"; break;
-        case STAGES.BUNNY: stageKey = "BUNNY"; break;
+        case STAGES.STAGE1: stageKey = "ForestFrenzy"; break;
+        case STAGES.STAGE2: stageKey = "WinterWonderland"; break;
+        case STAGES.STAGE3: stageKey = "MountainMadness"; break;
+        case STAGES.STAGE4: stageKey = "RockslideRumble"; break;
+        case STAGES.BUNNY: stageKey = "BunnySlopeBlitz"; break;
       }
       displayHighScores(stageKey);
     });
