@@ -103,6 +103,8 @@
   </audio>
 
   <script>
+    console.log("Script loaded");
+
     /* ---------------- Constants & Helper Functions ---------------- */
     const GAME_STATES = {
       MENU: 'menu',
@@ -131,8 +133,14 @@
     function loadImage(src) {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
+        img.onload = () => {
+          console.log(`Loaded image: ${src}`);
+          resolve(img);
+        };
+        img.onerror = () => {
+          console.error(`Error loading image: ${src}`);
+          reject();
+        };
         img.src = src;
       });
     }
@@ -177,6 +185,7 @@
         if (this.boostActive && Date.now() > this.boostEndTime) {
           this.speed = this.baseSpeed;
           this.boostActive = false;
+          console.log("Speed boost ended");
         }
       }
 
@@ -199,6 +208,7 @@
           this.speed *= 1.33;
           this.boostActive = true;
           this.boostEndTime = Date.now() + duration;
+          console.log("Speed boost activated for", duration, "ms");
         }
       }
     }
@@ -293,6 +303,8 @@
         this.elapsedTime = 0;
         this.scrollSpeed = 3; // Background scroll speed
         this.keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
+        this.debug = true; // Set to true to enable debugging logs
+        this.lastLogTime = -1;
 
         // Containers for preloaded assets
         this.assets = {
@@ -341,6 +353,7 @@
       }
 
       async preloadAssets() {
+        console.log("Preloading assets...");
         // Preload skier images for each player
         const players = ['ryan', 'alex', 'mitch'];
         for (const name of players) {
@@ -349,18 +362,23 @@
             right: await loadImage(`${name}-right.png`),
             forward: await loadImage(`${name}-forward.png`)
           };
+          console.log(`Loaded skier images for ${name}`);
         }
         // Preload tree and murder tree images
         this.assets.tree = await loadImage('tree.png');
+        console.log("Loaded tree image");
         this.assets.murderTree = await loadImage('murder-tree.png');
+        console.log("Loaded murder tree image");
         // Preload snowman images
         this.assets.snowman = {
           intact: await loadImage('snowman-intact.png'),
           hit: await loadImage('snowman-hit.png')
         };
+        console.log("Loaded snowman images");
       }
 
       initGameObjects(selectedPlayer) {
+        console.log("Initializing game objects for player:", selectedPlayer);
         // Initialize the skier using the chosen character images
         this.skier = new Skier(this.canvas.width / 2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
 
@@ -427,7 +445,7 @@
         if (this.state === GAME_STATES.PLAYING) {
           this.state = GAME_STATES.PAUSED;
           this.pauseStart = Date.now();
-          // Pause appropriate audio
+          console.log("Game paused");
           if (this.currentStage === STAGES.STAGE2) {
             this.audio.stage2.pause();
           } else if (this.currentStage === STAGES.STAGE3) {
@@ -438,6 +456,7 @@
         } else if (this.state === GAME_STATES.PAUSED) {
           this.state = GAME_STATES.PLAYING;
           this.pauseTime += Date.now() - this.pauseStart;
+          console.log("Game resumed");
           if (this.currentStage === STAGES.STAGE2) {
             this.audio.stage2.play();
           } else if (this.currentStage === STAGES.STAGE3) {
@@ -463,6 +482,7 @@
         for (let tree of this.trees) {
           tree.update(this.skier.speed / 2);
           if (checkCollision(this.skier, tree)) {
+            console.log("Collision with tree detected");
             this.state = GAME_STATES.GAME_OVER;
             showEndMenu(endImages.tree, this.elapsedTime);
             return;
@@ -474,6 +494,7 @@
         for (let snowman of this.snowmen) {
           snowman.update(this.skier.speed / 2);
           if (!snowman.hit && checkCollision(this.skier, snowman)) {
+            console.log("Collision with snowman detected");
             snowman.hit = true;
             this.skier.activateBoost(3000); // 3-second boost
           }
@@ -484,16 +505,26 @@
         this.elapsedTime = Math.floor((Date.now() - this.startTime - this.pauseTime) / 1000);
         document.getElementById('timer').textContent = `Time: ${this.elapsedTime} seconds`;
 
+        if (this.debug) {
+          // Log once per second
+          if (this.elapsedTime > this.lastLogTime) {
+            console.log("Update tick: elapsed time =", this.elapsedTime, "state =", this.state);
+            this.lastLogTime = this.elapsedTime;
+          }
+        }
+
         // Activate murder tree after 10 seconds
         if (this.elapsedTime >= 10 && !this.murderTree.active) {
           this.murderTree.active = true;
           this.murderTree.y = (this.currentStage === STAGES.STAGE3) ? -this.murderTree.height : this.canvas.height;
+          console.log("Murder tree activated");
         }
 
         // Update murder tree and check collision
         if (this.murderTree.active) {
           this.murderTree.update(this.skier, this.currentStage);
           if (checkCollision(this.skier, this.murderTree)) {
+            console.log("Collision with murder tree detected");
             this.state = GAME_STATES.GAME_OVER;
             showEndMenu(endImages.murderTree, this.elapsedTime);
             return;
@@ -509,6 +540,7 @@
 
         // Win condition: skier passes finish line
         if (this.skier.y < this.finishLine.y + this.finishLine.height) {
+          console.log("Win condition reached");
           this.state = GAME_STATES.WIN;
           showEndMenu(endImages.finish, this.elapsedTime);
           return;
@@ -542,6 +574,7 @@
       }
 
       startGame(selectedPlayer) {
+        console.log("Starting game for player:", selectedPlayer);
         // Switch audio from title to the stage music (add fade transitions if desired)
         this.audio.title.pause();
         if (this.currentStage === STAGES.STAGE2) {
@@ -573,6 +606,7 @@
 
     // Preload all assets, then show the menu
     game.preloadAssets().then(() => {
+      console.log("All assets loaded. Displaying menu.");
       document.getElementById('menu').style.display = 'block';
       canvas.style.display = 'none';
       game.audio.title.play();
@@ -582,6 +616,7 @@
 
     /* ---------------- UI Event Listeners ---------------- */
     document.getElementById('viewMovieButton').addEventListener('click', () => {
+      console.log("View Intro Movie button clicked");
       document.getElementById('menu').style.display = 'none';
       document.getElementById('introMovie').style.display = 'block';
       game.audio.title.play();
@@ -589,15 +624,68 @@
     });
 
     document.getElementById('introVideo').addEventListener('ended', () => {
+      console.log("Intro video ended");
       document.getElementById('introMovie').style.display = 'none';
       document.getElementById('menu').style.display = 'block';
     });
 
     document.getElementById('stage1Button').addEventListener('click', () => {
+      console.log("Stage 1 button clicked");
       game.currentStage = STAGES.STAGE1;
       document.getElementById('playerSelect').style.display = 'block';
     });
 
     document.getElementById('stage2Button').addEventListener('click', () => {
+      console.log("Stage 2 button clicked");
       game.currentStage = STAGES.STAGE2;
-      document.getElementById('playerSelect').style.displa
+      document.getElementById('playerSelect').style.display = 'block';
+    });
+
+    document.getElementById('stage3Button').addEventListener('click', () => {
+      console.log("Stage 3 button clicked");
+      game.currentStage = STAGES.STAGE3;
+      document.getElementById('playerSelect').style.display = 'block';
+    });
+
+    document.getElementById('player1Button').addEventListener('click', () => {
+      console.log("Player Ryan selected");
+      canvas.style.display = 'block';
+      game.initGameObjects('ryan');
+      game.startGame('ryan');
+    });
+
+    document.getElementById('player2Button').addEventListener('click', () => {
+      console.log("Player Alex selected");
+      canvas.style.display = 'block';
+      game.initGameObjects('alex');
+      game.startGame('alex');
+    });
+
+    document.getElementById('player3Button').addEventListener('click', () => {
+      console.log("Player Mitch selected");
+      canvas.style.display = 'block';
+      game.initGameObjects('mitch');
+      game.startGame('mitch');
+    });
+
+    document.getElementById('pauseButton').addEventListener('click', () => {
+      console.log("Pause button clicked");
+      game.togglePause();
+    });
+
+    document.getElementById('restartButton').addEventListener('click', () => {
+      console.log("Restart button clicked");
+      location.reload();
+    });
+
+    // Function to show end screen with appropriate image and time taken
+    function showEndMenu(imageSrc, elapsedTime) {
+      console.log("Showing end menu:", imageSrc, "Elapsed time:", elapsedTime);
+      document.getElementById('endImage').src = imageSrc;
+      document.getElementById('timeTaken').textContent = `Time Taken: ${elapsedTime} seconds`;
+      document.getElementById('endMenu').style.display = 'block';
+      canvas.style.display = 'none';
+    }
+  </script>
+</body>
+</html>
