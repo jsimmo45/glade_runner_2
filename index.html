@@ -35,7 +35,7 @@
       background-color: #45a049;
       transform: scale(1.02);
     }
-    #menu, #playerSelect, #endMenu, #pauseMenu, #introMovie, #highScorePanel {
+    #menu, #playerSelect, #endMenu, #pauseMenu, #introMovie, #highScorePanel, #soundtrackMenu {
       text-align: center;
       margin-top: 20px;
     }
@@ -72,21 +72,39 @@
       margin-left: auto;
       margin-right: auto;
     }
+    /* Soundtrack menu styling */
+    #soundtrackMenu button {
+      margin: 8px;
+    }
   </style>
 </head>
 <body>
-  <!-- Menu UI -->
+  <!-- Main Menu UI -->
   <div id="menu">
     <img id="titleImage" src="title-screen.png" alt="Title Screen">
     <br>
     <button id="viewMovieButton">View Intro Movie</button>
     <br>
-    <!-- Stage selection buttons with names -->
+    <!-- Stage selection buttons -->
     <button id="stage1Button">Forest Frenzy</button>
     <button id="stage2Button">Winter Wonderland</button>
     <button id="stage3Button">Mountain Madness</button>
     <button id="stage4Button">Rockslide Rumble</button>
     <button id="bunnyButton">Bunny Slope Blitz</button>
+    <br>
+    <!-- New Soundtrack button -->
+    <button id="soundtrackButton">Soundtrack</button>
+  </div>
+  
+  <!-- Soundtrack Menu UI -->
+  <div id="soundtrackMenu" style="display:none;">
+    <h2>Soundtrack</h2>
+    <button id="playTitleMusic">Escape the Murder Tree</button>
+    <button id="playStage1Music">Murder Tree Behind You</button>
+    <button id="playStage2Music">Murder Tree Breakdown</button>
+    <button id="playStage3Music">Stage 3 Music</button>
+    <br>
+    <button id="backToMenuFromSoundtrack">Back to Menu</button>
   </div>
   
   <!-- Character selection UI -->
@@ -132,7 +150,7 @@
     </video>
   </div>
   
-  <!-- Fixed canvas (800×600) -->
+  <!-- Fixed-size canvas -->
   <canvas id="gameCanvas" width="800" height="600" style="display:none;"></canvas>
   <div id="timer">Time: 0 seconds</div>
 
@@ -176,7 +194,7 @@
       BUNNY: 5
     };
 
-    // Axis-aligned bounding box collision check
+    // AABB collision check
     function checkCollision(a, b) {
       return a.x < b.x + b.width &&
              a.x + a.width > b.x &&
@@ -220,7 +238,7 @@
         if (this.x < 0) { this.x = 800; }
       }
       draw(ctx) {
-        // Use a light grey color so snow is visible on a white background.
+        // Use a lightly grey color so snow is visible on white.
         ctx.fillStyle = 'rgba(200,200,200,0.8)';
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -453,7 +471,7 @@
       }
       initGameObjects(selectedPlayer) {
         console.log("Initializing game objects for player:", selectedPlayer);
-        // Create skier with fixed base speed 6.
+        // Create the skier (speed 6 as originally)
         this.skier = new Skier(800/2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
         this.distance = 0;
         this.collisionEffect = null;
@@ -487,9 +505,9 @@
             }
           }
           this.murderTree = new MurderTree(Math.random() * (800 - 45), 600 + 100, 45, 75, 4.5, this.assets.murderTree);
-          // Create falling snow (now using grey flakes).
+          // Create falling snow – 33% more dense than 50, so ~67 flakes.
           this.snowflakes = [];
-          for (let i = 0; i < 50; i++) {
+          for (let i = 0; i < 67; i++) {
             let x = Math.random() * 800;
             let y = Math.random() * 600;
             let size = Math.random() * 2 + 1;
@@ -571,7 +589,7 @@
             this.skier.activateBoost(3000);
           }
         }
-        // Update obstacles based on stage.
+        // Update obstacles.
         if (this.currentStage === STAGES.STAGE1 ||
             this.currentStage === STAGES.STAGE2 ||
             this.currentStage === STAGES.STAGE3) {
@@ -642,7 +660,7 @@
           this.murderTree.y = (this.currentStage === STAGES.STAGE3) ? -this.murderTree.height : 600;
           console.log("Murder tree activated");
         }
-        // Win condition: when the accumulated distance reaches totalDistance.
+        // Win condition: when distance reaches totalDistance.
         if (this.distance >= this.totalDistance && this.currentStage !== STAGES.BUNNY) {
           console.log("Win condition reached");
           this.state = GAME_STATES.WIN;
@@ -754,6 +772,15 @@
       document.getElementById('highScoreList').innerHTML = html;
     }
 
+    /* ---------------- End Game Screen Helper ---------------- */
+    function showEndMenu(imageSrc, elapsedTime) {
+      console.log("Showing end menu:", imageSrc, "Elapsed time:", elapsedTime);
+      document.getElementById('endImage').src = imageSrc;
+      document.getElementById('timeTaken').textContent = `Time Taken: ${elapsedTime} seconds`;
+      document.getElementById('endMenu').style.display = 'block';
+      canvasElem.style.display = 'none';
+    }
+
     /* ---------------- UI Event Listeners ---------------- */
     document.getElementById('viewMovieButton').addEventListener('click', () => {
       console.log("View Intro Movie button clicked");
@@ -796,6 +823,47 @@
       game.currentStage = STAGES.BUNNY;
       document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
+    });
+    // Soundtrack button in main menu
+    document.getElementById('soundtrackButton').addEventListener('click', () => {
+      console.log("Soundtrack button clicked");
+      document.getElementById('menu').style.display = 'none';
+      document.getElementById('soundtrackMenu').style.display = 'block';
+    });
+    // Back button in soundtrack menu
+    document.getElementById('backToMenuFromSoundtrack').addEventListener('click', () => {
+      console.log("Back to menu from soundtrack");
+      document.getElementById('soundtrackMenu').style.display = 'none';
+      document.getElementById('menu').style.display = 'block';
+    });
+    // Soundtrack buttons: pause all and then play the selected song.
+    document.getElementById('playTitleMusic').addEventListener('click', () => {
+      game.audio.stage1.pause();
+      game.audio.stage2.pause();
+      game.audio.stage3.pause();
+      game.audio.title.currentTime = 0;
+      game.audio.title.play();
+    });
+    document.getElementById('playStage1Music').addEventListener('click', () => {
+      game.audio.title.pause();
+      game.audio.stage2.pause();
+      game.audio.stage3.pause();
+      game.audio.stage1.currentTime = 0;
+      game.audio.stage1.play();
+    });
+    document.getElementById('playStage2Music').addEventListener('click', () => {
+      game.audio.title.pause();
+      game.audio.stage1.pause();
+      game.audio.stage3.pause();
+      game.audio.stage2.currentTime = 0;
+      game.audio.stage2.play();
+    });
+    document.getElementById('playStage3Music').addEventListener('click', () => {
+      game.audio.title.pause();
+      game.audio.stage1.pause();
+      game.audio.stage2.pause();
+      game.audio.stage3.currentTime = 0;
+      game.audio.stage3.play();
     });
     document.getElementById('player1Button').addEventListener('click', () => {
       console.log("Player Ryan selected");
