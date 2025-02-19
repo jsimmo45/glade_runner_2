@@ -9,7 +9,7 @@
       font-family: sans-serif;
       text-align: center;
     }
-    /* Revert to fixed canvas size (as in your original code) */
+    /* Fixed canvas size as in your original code */
     canvas {
       width: 800px;
       height: 600px;
@@ -81,7 +81,7 @@
     <br>
     <button id="viewMovieButton">View Intro Movie</button>
     <br>
-    <!-- Stage selection buttons with new names -->
+    <!-- Stage selection buttons with names -->
     <button id="stage1Button">Forest Frenzy</button>
     <button id="stage2Button">Winter Wonderland</button>
     <button id="stage3Button">Mountain Madness</button>
@@ -132,7 +132,7 @@
     </video>
   </div>
   
-  <!-- Fixed-size canvas (800x600) -->
+  <!-- Fixed canvas (800×600) -->
   <canvas id="gameCanvas" width="800" height="600" style="display:none;"></canvas>
   <div id="timer">Time: 0 seconds</div>
 
@@ -167,7 +167,7 @@
       WIN: 'win'
     };
 
-    // Stage IDs: 1-4 and 5 for Bunny Slope Blitz
+    // Stage IDs: 1–4 and 5 for Bunny Slope Blitz
     const STAGES = {
       STAGE1: 1,
       STAGE2: 2,
@@ -176,7 +176,7 @@
       BUNNY: 5
     };
 
-    // Simple axis-aligned bounding box collision check
+    // Axis-aligned bounding box collision check
     function checkCollision(a, b) {
       return a.x < b.x + b.width &&
              a.x + a.width > b.x &&
@@ -184,7 +184,7 @@
              a.y + a.height > b.y;
     }
 
-    // Load image via Promise
+    // Load an image and return a Promise
     function loadImage(src) {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -200,7 +200,7 @@
       });
     }
 
-    /* ---------------- New Falling Snow for Stage 2 ---------------- */
+    /* ---------------- SnowFlake (for Stage 2) ---------------- */
     class SnowFlake {
       constructor(x, y, size, speed, drift) {
         this.x = x;
@@ -212,7 +212,7 @@
       update() {
         this.y += this.speed;
         this.x += this.drift;
-        if (this.y > 600) { // canvas height fixed at 600
+        if (this.y > 600) { // canvas height = 600
           this.y = -this.size;
           this.x = Math.random() * 800;
         }
@@ -220,7 +220,8 @@
         if (this.x < 0) { this.x = 800; }
       }
       draw(ctx) {
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        // Use a light grey color so snow is visible on a white background.
+        ctx.fillStyle = 'rgba(200,200,200,0.8)';
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         ctx.fill();
@@ -234,10 +235,10 @@
         this.y = y;
         this.width = width;
         this.height = height;
-        this.baseSpeed = 6;  // original speed
+        this.baseSpeed = 6;
         this.speed = this.baseSpeed;
         this.direction = 'forward';
-        this.images = images; // { left, right, forward }
+        this.images = images;
         this.boostActive = false;
         this.boostEndTime = 0;
       }
@@ -246,7 +247,6 @@
         if (keys.ArrowRight) { this.x += this.speed; this.direction = 'right'; }
         if (keys.ArrowUp) { this.y -= this.speed; this.direction = 'forward'; }
         if (keys.ArrowDown) { this.y += this.speed; this.direction = 'forward'; }
-        // Constrain within canvas
         this.x = Math.max(0, Math.min(this.x, canvasWidth - this.width));
         this.y = Math.max(0, Math.min(this.y, canvasHeight - this.height));
         if (this.boostActive && Date.now() > this.boostEndTime) {
@@ -289,7 +289,6 @@
       update(scrollSpeed) {
         this.y -= scrollSpeed;
         if (this.y < -this.height) {
-          // Reset tree to bottom at a random x
           this.y = 600 + Math.random() * 6000;
           this.x = Math.random() * (800 - this.width);
         }
@@ -340,7 +339,6 @@
       }
     }
 
-    // Boulder for Stage 4 using an image (assumes boulder.png exists)
     class Boulder {
       constructor(x, y, radius, speed, image) {
         this.x = x;
@@ -361,7 +359,6 @@
       }
     }
 
-    // Jump ramp for Bunny Slope Blitz
     class Jump {
       constructor(x, y, width, height) {
         this.x = x;
@@ -391,8 +388,7 @@
         this.startTime = 0;
         this.elapsedTime = 0;
         this.distance = 0;
-        // For stages 1-4, totalDistance is 10 screens (10*600 = 6000).
-        // For Bunny Slope, make it shorter.
+        // For stages 1-4, totalDistance = 6000; for Bunny Slope, use a shorter course.
         this.totalDistance = 6000;
         this.keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
         this.collisionEffect = null;
@@ -404,9 +400,9 @@
         this.snowmen = [];
         this.boulders = []; // for Stage 4
         this.murderTree = null;
-        this.jump = null;   // for Bunny Slope
+        this.jump = null;   // for Bunny Slope Blitz
         this.snowflakes = []; // for falling snow in Stage 2
-        // Finish line is drawn as a checkerboard
+        // Finish line (checkerboard)
         this.finishLine = { y: -6000, width: 800, height: 40 };
         // Audio references
         this.audio = {
@@ -457,19 +453,19 @@
       }
       initGameObjects(selectedPlayer) {
         console.log("Initializing game objects for player:", selectedPlayer);
-        // Create the skier (fixed speed of 6 as originally)
+        // Create skier with fixed base speed 6.
         this.skier = new Skier(800/2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
         this.distance = 0;
         this.collisionEffect = null;
-        // Set finish line and totalDistance depending on stage
+        // Set course length based on stage.
         if (this.currentStage === STAGES.BUNNY) {
-          this.totalDistance = 1800; // shorter course for Bunny Slope Blitz
+          this.totalDistance = 1800;
           this.finishLine.y = -1800;
         } else {
           this.totalDistance = 6000;
           this.finishLine.y = -6000;
         }
-        // Create obstacles based on stage:
+        // Create obstacles based on stage.
         if (this.currentStage === STAGES.STAGE1) {  // Forest Frenzy
           this.trees = [];
           for (let i = 0; i < 20; i++) {
@@ -491,7 +487,7 @@
             }
           }
           this.murderTree = new MurderTree(Math.random() * (800 - 45), 600 + 100, 45, 75, 4.5, this.assets.murderTree);
-          // Create falling snow
+          // Create falling snow (now using grey flakes).
           this.snowflakes = [];
           for (let i = 0; i < 50; i++) {
             let x = Math.random() * 800;
@@ -520,7 +516,7 @@
           this.boulders = [];
           for (let i = 0; i < 10; i++) {
             let boulderX = Math.random() * (800 - 40) + 20;
-            let boulderY = Math.random() * -600; // start above
+            let boulderY = Math.random() * -600;
             this.boulders.push(new Boulder(boulderX, boulderY, 20, 2, this.assets.boulder));
           }
           this.murderTree = new MurderTree(Math.random() * (800 - 45), 600 + 100, 45, 75, 4.5, this.assets.murderTree);
@@ -536,7 +532,6 @@
             }
           }
           this.murderTree = null;
-          // Place a jump ramp near the finish line.
           this.jump = new Jump(800/2 - 50, this.finishLine.y + 50, 100, 20);
         }
         // Create snowmen (always present)
@@ -565,9 +560,7 @@
         }
       }
       update() {
-        // Update skier
         this.skier.update(this.keys, 800, 600);
-        // Increase distance by the skier's speed each frame.
         this.distance += this.skier.speed;
         // Check collisions with snowmen.
         for (let snowman of this.snowmen) {
@@ -578,8 +571,10 @@
             this.skier.activateBoost(3000);
           }
         }
-        // For obstacles, update then check collision.
-        if (this.currentStage === STAGES.STAGE1 || this.currentStage === STAGES.STAGE2 || this.currentStage === STAGES.STAGE3) {
+        // Update obstacles based on stage.
+        if (this.currentStage === STAGES.STAGE1 ||
+            this.currentStage === STAGES.STAGE2 ||
+            this.currentStage === STAGES.STAGE3) {
           for (let tree of this.trees) {
             tree.update(this.skier.speed / 2);
             if (checkCollision(this.skier, tree)) {
@@ -630,7 +625,7 @@
         if (this.currentStage === STAGES.STAGE2 && this.snowflakes) {
           for (let flake of this.snowflakes) { flake.update(); }
         }
-        // Update murder tree if it exists and is active.
+        // Update murder tree if active.
         if (this.murderTree && this.murderTree.active) {
           this.murderTree.update(this.skier);
           if (checkCollision(this.skier, this.murderTree)) {
@@ -640,14 +635,14 @@
             return;
           }
         }
-        // Activate murder tree after 10 seconds (if applicable).
+        // Activate murder tree after 10 seconds.
         this.elapsedTime = Math.floor((Date.now() - this.startTime - this.pauseTime) / 1000);
         if (this.elapsedTime >= 10 && this.murderTree && !this.murderTree.active) {
           this.murderTree.active = true;
           this.murderTree.y = (this.currentStage === STAGES.STAGE3) ? -this.murderTree.height : 600;
           console.log("Murder tree activated");
         }
-        // Win condition: if total distance reached, end the stage.
+        // Win condition: when the accumulated distance reaches totalDistance.
         if (this.distance >= this.totalDistance && this.currentStage !== STAGES.BUNNY) {
           console.log("Win condition reached");
           this.state = GAME_STATES.WIN;
@@ -677,13 +672,10 @@
       drawScene() {
         this.ctx.clearRect(0, 0, 800, 600);
         this.drawFinishLine();
-        // In Stage 2, draw falling snow first.
         if (this.currentStage === STAGES.STAGE2 && this.snowflakes) {
           for (let flake of this.snowflakes) { flake.draw(this.ctx); }
         }
-        // Draw snowmen.
         for (let snowman of this.snowmen) { snowman.draw(this.ctx); }
-        // Draw obstacles.
         if (this.currentStage !== STAGES.STAGE4 && this.currentStage !== STAGES.BUNNY) {
           for (let tree of this.trees) { tree.draw(this.ctx); }
         } else if (this.currentStage === STAGES.STAGE4) {
