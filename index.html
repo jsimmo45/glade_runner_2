@@ -11,6 +11,7 @@
       flex-direction: column;
       align-items: center;
     }
+    /* Make the canvas responsive */
     canvas {
       background: #fff;
       border: 5px solid #333;
@@ -33,11 +34,10 @@
       background-color: #45a049;
       transform: scale(1.02);
     }
-    #menu, #playerSelect, #endMenu, #pauseMenu, #introMovie {
+    #menu, #playerSelect, #endMenu, #pauseMenu, #introMovie, #highScorePanel {
       text-align: center;
       margin-top: 20px;
     }
-    /* Arrange player selection images nicely */
     #playerSelect div {
       display: inline-block;
       margin: 0 20px;
@@ -52,6 +52,25 @@
       font-size: 24px;
       margin-top: 10px;
     }
+    /* High score input styling */
+    #highScorePanel input[type="text"] {
+      padding: 8px;
+      font-size: 16px;
+      width: 200px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    #highScorePanel button {
+      padding: 8px 16px;
+      font-size: 16px;
+    }
+    #highScoreList {
+      margin-top: 10px;
+      text-align: left;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
   </style>
 </head>
 <body>
@@ -65,7 +84,8 @@
     <button id="stage1Button">Stage 1</button>
     <button id="stage2Button">Stage 2</button>
     <button id="stage3Button">Stage 3</button>
-    <button id="stage4Button">Stage 4</button>
+    <button id="stage4Button">Falling Boulders</button>
+    <button id="bunnyButton">Bunny Slope</button>
   </div>
   
   <!-- Character selection UI -->
@@ -91,7 +111,15 @@
   
   <div id="endMenu" style="display:none;">
     <p id="timeTaken"></p>
-    <img id="endImage" src="" alt="End Image">
+    <img id="endImage" src="" alt="End Image"><br>
+    <!-- High score entry panel -->
+    <div id="highScorePanel">
+      <input type="text" id="playerName" placeholder="Enter your name">
+      <button id="submitScoreButton">Submit Score</button>
+      <br>
+      <button id="viewHighScoresButton">View High Scores</button>
+    </div>
+    <div id="highScoreList"></div>
     <br>
     <button id="restartButton">Restart Game</button>
   </div>
@@ -103,7 +131,8 @@
     </video>
   </div>
   
-  <canvas id="gameCanvas" width="800" height="600" style="display:none;"></canvas>
+  <!-- The canvas will be resized via JavaScript -->
+  <canvas id="gameCanvas" style="display:none;"></canvas>
   <div id="timer">Time: 0 seconds</div>
 
   <!-- Audio Elements -->
@@ -127,6 +156,16 @@
   <script>
     console.log("Script loaded");
 
+    /* ---------------- Canvas Resize ---------------- */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    function resizeCanvas() {
+      canvas.width = window.innerWidth * 0.9;
+      canvas.height = window.innerHeight * 0.8;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
     /* ---------------- Constants & Helpers ---------------- */
     const GAME_STATES = {
       MENU: 'menu',
@@ -137,11 +176,13 @@
       WIN: 'win'
     };
 
+    // Stage IDs: 1-4 as before, 5 for Bunny Slope
     const STAGES = {
       STAGE1: 1,
       STAGE2: 2,
       STAGE3: 3,
-      STAGE4: 4
+      STAGE4: 4,
+      BUNNY: 5
     };
 
     // AABB collision check
@@ -287,13 +328,14 @@
       }
     }
 
-    // New obstacle for Stage 4
+    // New obstacle for Stage 4: Boulder drawn with an image.
     class Boulder {
-      constructor(x, y, radius, speed) {
+      constructor(x, y, radius, speed, image) {
         this.x = x;
         this.y = y;
         this.radius = radius;
         this.speed = speed;
+        this.image = image;
       }
       update(scrollSpeed) {
         // Fall downward (plus scroll)
@@ -304,9 +346,26 @@
         }
       }
       draw(ctx) {
-        ctx.fillStyle = 'gray';
+        // Draw the boulder image centered at (x, y)
+        ctx.drawImage(this.image, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+      }
+    }
+
+    // New object for Bunny Slope: a jump ramp.
+    class Jump {
+      constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+      }
+      draw(ctx) {
+        ctx.fillStyle = '#FFA500';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.moveTo(this.x, this.y + this.height);
+        ctx.lineTo(this.x + this.width, this.y + this.height);
+        ctx.lineTo(this.x + this.width, this.y);
+        ctx.closePath();
         ctx.fill();
       }
     }
@@ -322,18 +381,19 @@
         this.startTime = 0;
         this.elapsedTime = 0;
         this.distance = 0;
-        this.totalDistance = 10 * this.canvas.height; // arbitrary total for progress
+        this.totalDistance = 10 * this.canvas.height; // for progress bar
         this.keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
-        this.collisionEffect = null; // to show "BAM!" on collision
+        this.collisionEffect = null; // for "BAM!" animation
         // Asset containers
-        this.assets = { skier: {}, tree: null, murderTree: null, snowman: {} };
+        this.assets = { skier: {}, tree: null, murderTree: null, snowman: {}, boulder: null };
         // Game objects
         this.skier = null;
         this.trees = [];
         this.snowmen = [];
         this.boulders = [];  // for Stage 4
         this.murderTree = null;
-        // Finish line (drawn as a checkerboard)
+        this.jump = null;    // for Bunny Slope
+        // Finish line (checkerboard)
         this.finishLine = { y: -10 * this.canvas.height, width: this.canvas.width, height: 40 };
         // Audio references
         this.audio = {
@@ -379,15 +439,17 @@
           hit: await loadImage('snowman-hit.png')
         };
         console.log("Loaded snowman images");
+        // Load boulder image for Stage 4
+        this.assets.boulder = await loadImage('boulder.png');
+        console.log("Loaded boulder image");
       }
       initGameObjects(selectedPlayer) {
         console.log("Initializing game objects for player:", selectedPlayer);
         // Create the skier
         this.skier = new Skier(this.canvas.width/2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
-        // Reset progress
+        // Reset progress and finish line
         this.distance = 0;
         this.finishLine.y = -10 * this.canvas.height;
-        // Clear collision effect
         this.collisionEffect = null;
         // Create obstacles based on stage
         if (this.currentStage === STAGES.STAGE1) {
@@ -398,6 +460,14 @@
             const treeY = Math.random() * this.canvas.height * 10 + this.canvas.height;
             this.trees.push(new Tree(treeX, treeY, 60, 80, this.assets.tree, this.canvas.height));
           }
+          // Always include murder tree for Stage 1-3 & 4 (except Bunny)
+          this.murderTree = new MurderTree(
+            Math.random() * (this.canvas.width - 45),
+            this.canvas.height + 100,
+            45, 75, 4.5,
+            this.assets.murderTree,
+            this.canvas.width, this.canvas.height
+          );
         } else if (this.currentStage === STAGES.STAGE2) {
           // Rows of trees with gaps
           this.trees = [];
@@ -411,6 +481,13 @@
               }
             }
           }
+          this.murderTree = new MurderTree(
+            Math.random() * (this.canvas.width - 45),
+            this.canvas.height + 100,
+            45, 75, 4.5,
+            this.assets.murderTree,
+            this.canvas.width, this.canvas.height
+          );
         } else if (this.currentStage === STAGES.STAGE3) {
           // Curving narrow path
           this.trees = [];
@@ -426,30 +503,54 @@
               }
             }
           }
+          this.murderTree = new MurderTree(
+            Math.random() * (this.canvas.width - 45),
+            this.canvas.height + 100,
+            45, 75, 4.5,
+            this.assets.murderTree,
+            this.canvas.width, this.canvas.height
+          );
         } else if (this.currentStage === STAGES.STAGE4) {
-          // New stage: Falling boulders instead of trees.
+          // Stage with falling boulders instead of trees
           this.boulders = [];
           for (let i = 0; i < 10; i++) {
             let boulderX = Math.random() * (this.canvas.width - 40) + 20;
             let boulderY = Math.random() * -this.canvas.height; // start above
-            this.boulders.push(new Boulder(boulderX, boulderY, 20, 2));
+            this.boulders.push(new Boulder(boulderX, boulderY, 20, 2, this.assets.boulder));
           }
+          this.murderTree = new MurderTree(
+            Math.random() * (this.canvas.width - 45),
+            this.canvas.height + 100,
+            45, 75, 4.5,
+            this.assets.murderTree,
+            this.canvas.width, this.canvas.height
+          );
+        } else if (this.currentStage === STAGES.BUNNY) {
+          // Bunny Slope: Only trees and a jump ramp at the end; no murder tree.
+          this.trees = [];
+          // Create a few rows of trees
+          const rows = 5;
+          const cols = Math.floor(this.canvas.width / 60);
+          for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+              // Leave gaps for the "bunny" path
+              if (j % 2 === 0) {
+                this.trees.push(new Tree(j * 60, this.canvas.height * i, 60, 100, this.assets.tree, this.canvas.height));
+              }
+            }
+          }
+          // No murder tree in Bunny Slope
+          this.murderTree = null;
+          // Place a jump ramp near the finish line (use finishLine.y + some offset)
+          this.jump = new Jump(this.canvas.width/2 - 50, this.finishLine.y + 50, 100, 20);
         }
-        // Create snowmen (always present)
+        // Create snowmen (present in all stages)
         this.snowmen = [];
         for (let i = 0; i < 3; i++) {
           const snowmanX = Math.random() * (this.canvas.width - 40);
           const snowmanY = Math.random() * this.canvas.height * 10;
           this.snowmen.push(new Snowman(snowmanX, snowmanY, 40, 60, this.assets.snowman, this.canvas.height));
         }
-        // Initialize the murder tree (present in all stages)
-        this.murderTree = new MurderTree(
-          Math.random() * (this.canvas.width - 45),
-          this.canvas.height + 100,
-          45, 75, 4.5,
-          this.assets.murderTree,
-          this.canvas.width, this.canvas.height
-        );
       }
       togglePause() {
         if (this.state === GAME_STATES.PLAYING) {
@@ -468,7 +569,6 @@
           else { this.audio.stage1.play(); }
         }
       }
-      // Update positions and collisions (no drawing here)
       update() {
         // Update skier and finish line
         this.skier.update(this.keys, this.canvas.width, this.canvas.height);
@@ -483,8 +583,8 @@
             this.skier.activateBoost(3000);
           }
         }
-        // Update obstacles depending on stage
-        if (this.currentStage !== STAGES.STAGE4) {
+        // Update obstacles based on stage
+        if (this.currentStage !== STAGES.STAGE4 && this.currentStage !== STAGES.BUNNY) {
           for (let tree of this.trees) {
             tree.update(this.skier.speed / 2);
             if (checkCollision(this.skier, tree)) {
@@ -496,10 +596,9 @@
               return;
             }
           }
-        } else { // Stage 4: update boulders
+        } else if (this.currentStage === STAGES.STAGE4) {
           for (let boulder of this.boulders) {
             boulder.update(this.skier.speed / 2);
-            // Approximate boulder collision as a box around the circle
             let boulderBox = { x: boulder.x - boulder.radius, y: boulder.y - boulder.radius, width: boulder.radius * 2, height: boulder.radius * 2 };
             if (checkCollision(this.skier, boulderBox)) {
               console.log("Collision with boulder detected");
@@ -510,9 +609,42 @@
               return;
             }
           }
+          // Also update murder tree in Stage 4
+          if (this.murderTree.active) {
+            this.murderTree.update(this.skier, this.currentStage);
+            if (checkCollision(this.skier, this.murderTree)) {
+              console.log("Collision with murder tree detected");
+              if (!this.collisionEffect) {
+                this.collisionEffect = { x: this.skier.x, y: this.skier.y };
+                setTimeout(() => { showEndMenu(endImages.murderTree, this.elapsedTime); }, 300);
+              }
+              return;
+            }
+          }
+        } else if (this.currentStage === STAGES.BUNNY) {
+          // In Bunny Slope, update trees and the jump ramp.
+          for (let tree of this.trees) {
+            tree.update(this.skier.speed / 2);
+            if (checkCollision(this.skier, tree)) {
+              console.log("Collision with tree detected on Bunny Slope");
+              if (!this.collisionEffect) {
+                this.collisionEffect = { x: this.skier.x, y: this.skier.y };
+                setTimeout(() => { showEndMenu(endImages.tree, this.elapsedTime); }, 300);
+              }
+              return;
+            }
+          }
+          // Check for collision with the jump ramp
+          if (this.jump && checkCollision(this.skier, { x: this.jump.x, y: this.jump.y, width: this.jump.width, height: this.jump.height })) {
+            console.log("Jump ramp reached on Bunny Slope!");
+            // For Bunny Slope, reaching the jump counts as a win
+            showEndMenu(endImages.finish, this.elapsedTime);
+            this.state = GAME_STATES.WIN;
+            return;
+          }
         }
-        // Update murder tree
-        if (this.murderTree.active) {
+        // Update murder tree for stages (if applicable)
+        if (this.murderTree && this.murderTree.active) {
           this.murderTree.update(this.skier, this.currentStage);
           if (checkCollision(this.skier, this.murderTree)) {
             console.log("Collision with murder tree detected");
@@ -523,49 +655,18 @@
             return;
           }
         }
-        // Activate murder tree after 10 seconds
+        // Activate murder tree after 10 seconds (for stages that have it)
         this.elapsedTime = Math.floor((Date.now() - this.startTime - this.pauseTime) / 1000);
-        if (this.elapsedTime >= 10 && !this.murderTree.active) {
+        if (this.elapsedTime >= 10 && this.murderTree && !this.murderTree.active) {
           this.murderTree.active = true;
           this.murderTree.y = (this.currentStage === STAGES.STAGE3) ? -this.murderTree.height : this.canvas.height;
           console.log("Murder tree activated");
         }
-        // Win condition: skier passes finish line
-        if (this.skier.y < this.finishLine.y + this.finishLine.height) {
+        // Win condition: skier passes finish line (for stages without jump)
+        if (this.skier.y < this.finishLine.y + this.finishLine.height && this.currentStage !== STAGES.BUNNY) {
           console.log("Win condition reached");
           showEndMenu(endImages.finish, this.elapsedTime);
           this.state = GAME_STATES.WIN;
-        }
-      }
-      // Draw all objects in proper order
-      drawScene() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.drawFinishLine();
-        // Draw snowmen (first)
-        for (let snowman of this.snowmen) { snowman.draw(this.ctx); }
-        // Then obstacles: trees OR (for stage 4) boulders
-        if (this.currentStage !== STAGES.STAGE4) {
-          for (let tree of this.trees) { tree.draw(this.ctx); }
-        } else {
-          for (let boulder of this.boulders) { boulder.draw(this.ctx); }
-        }
-        // Draw murder tree if active
-        if (this.murderTree.active) { this.murderTree.draw(this.ctx); }
-        // Draw the skier on top
-        this.skier.draw(this.ctx);
-        // Draw progress bar at the top
-        this.drawProgressBar();
-        // If boost is active, show a message
-        if (this.skier.boostActive) {
-          this.ctx.fillStyle = 'black';
-          this.ctx.font = '20px Arial';
-          this.ctx.fillText('Speed boost!', this.skier.x, this.skier.y - 10);
-        }
-        // If a collision effect is active, draw "BAM!" at collision point
-        if (this.collisionEffect) {
-          this.ctx.fillStyle = 'red';
-          this.ctx.font = '30px Arial';
-          this.ctx.fillText("BAM!", this.collisionEffect.x, this.collisionEffect.y);
         }
       }
       drawFinishLine() {
@@ -577,32 +678,55 @@
         }
       }
       drawProgressBar() {
-        // Calculate progress as distance traveled over totalDistance
         let progress = Math.min(1, this.distance / this.totalDistance);
         const barWidth = this.canvas.width - 20;
         const barHeight = 20;
-        // Draw background bar
         this.ctx.fillStyle = '#ddd';
         this.ctx.fillRect(10, 10, barWidth, barHeight);
-        // Draw progress portion
         this.ctx.fillStyle = '#4CAF50';
         this.ctx.fillRect(10, 10, barWidth * progress, barHeight);
-        // Draw border
         this.ctx.strokeStyle = '#333';
         this.ctx.lineWidth = 2;
         this.ctx.strokeRect(10, 10, barWidth, barHeight);
       }
-      // Main game loop: update (if playing) then draw scene
+      drawScene() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawFinishLine();
+        // Draw snowmen first
+        for (let snowman of this.snowmen) { snowman.draw(this.ctx); }
+        // Then obstacles: trees or (for Stage 4) boulders
+        if (this.currentStage !== STAGES.STAGE4 && this.currentStage !== STAGES.BUNNY) {
+          for (let tree of this.trees) { tree.draw(this.ctx); }
+        } else if (this.currentStage === STAGES.STAGE4) {
+          for (let boulder of this.boulders) { boulder.draw(this.ctx); }
+        } else if (this.currentStage === STAGES.BUNNY) {
+          for (let tree of this.trees) { tree.draw(this.ctx); }
+          if (this.jump) { this.jump.draw(this.ctx); }
+        }
+        // Draw murder tree if present
+        if (this.murderTree && this.murderTree.active) { this.murderTree.draw(this.ctx); }
+        // Draw skier on top
+        this.skier.draw(this.ctx);
+        this.drawProgressBar();
+        if (this.skier.boostActive) {
+          this.ctx.fillStyle = 'black';
+          this.ctx.font = '20px Arial';
+          this.ctx.fillText('Speed boost!', this.skier.x, this.skier.y - 10);
+        }
+        if (this.collisionEffect) {
+          this.ctx.fillStyle = 'red';
+          this.ctx.font = '30px Arial';
+          this.ctx.fillText("BAM!", this.collisionEffect.x, this.collisionEffect.y);
+        }
+      }
       gameLoop() {
         if (this.state === GAME_STATES.PLAYING) { this.update(); }
         this.drawScene();
-        // Update timer display
         document.getElementById('timer').textContent = `Time: ${this.elapsedTime} seconds`;
         requestAnimationFrame(this.gameLoop.bind(this));
       }
       startGame(selectedPlayer) {
         console.log("Starting game for player:", selectedPlayer);
-        // Switch audio from title to stage music
         this.audio.title.pause();
         if (this.currentStage === STAGES.STAGE2) { this.audio.stage2.play(); }
         else if (this.currentStage === STAGES.STAGE3) { this.audio.stage3.play(); }
@@ -615,22 +739,40 @@
     }
 
     /* ---------------- Global Initialization ---------------- */
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
     const endImages = {
       tree: 'hit-tree.jpg',
       murderTree: 'murder-tree-caught.jpg',
       finish: 'stage-finished.jpg'
     };
     const game = new Game(canvas, ctx);
-
-    // Preload assets then show the menu
     game.preloadAssets().then(() => {
       console.log("All assets loaded. Displaying menu.");
       document.getElementById('menu').style.display = 'block';
       canvas.style.display = 'none';
       game.audio.title.play();
     }).catch(err => { console.error('Error loading assets', err); });
+
+    /* ---------------- High Score Functions ---------------- */
+    function getHighScores(stageKey) {
+      let scores = localStorage.getItem('highScores_' + stageKey);
+      return scores ? JSON.parse(scores) : [];
+    }
+    function saveHighScore(stageKey, record) {
+      let scores = getHighScores(stageKey);
+      scores.push(record);
+      scores.sort((a, b) => a.time - b.time); // lower time is better
+      if (scores.length > 10) { scores = scores.slice(0, 10); }
+      localStorage.setItem('highScores_' + stageKey, JSON.stringify(scores));
+    }
+    function displayHighScores(stageKey) {
+      let scores = getHighScores(stageKey);
+      let html = "<h3>High Scores for " + stageKey + "</h3><ol>";
+      for (let rec of scores) {
+        html += `<li>${rec.name} (${rec.skier}) - ${rec.time} sec</li>`;
+      }
+      html += "</ol>";
+      document.getElementById('highScoreList').innerHTML = html;
+    }
 
     /* ---------------- UI Event Listeners ---------------- */
     document.getElementById('viewMovieButton').addEventListener('click', () => {
@@ -645,7 +787,6 @@
       document.getElementById('introMovie').style.display = 'none';
       document.getElementById('menu').style.display = 'block';
     });
-    // When a stage button is clicked, hide the menu and show character selection.
     document.getElementById('stage1Button').addEventListener('click', () => {
       console.log("Stage 1 button clicked");
       game.currentStage = STAGES.STAGE1;
@@ -670,7 +811,12 @@
       document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
-    // Character selection buttons
+    document.getElementById('bunnyButton').addEventListener('click', () => {
+      console.log("Bunny Slope button clicked");
+      game.currentStage = STAGES.BUNNY;
+      document.getElementById('menu').style.display = 'none';
+      document.getElementById('playerSelect').style.display = 'block';
+    });
     document.getElementById('player1Button').addEventListener('click', () => {
       console.log("Player Ryan selected");
       canvas.style.display = 'block';
@@ -700,15 +846,34 @@
       console.log("Restart button clicked");
       location.reload();
     });
-
-    // End screen function
-    function showEndMenu(imageSrc, elapsedTime) {
-      console.log("Showing end menu:", imageSrc, "Elapsed time:", elapsedTime);
-      document.getElementById('endImage').src = imageSrc;
-      document.getElementById('timeTaken').textContent = `Time Taken: ${elapsedTime} seconds`;
-      document.getElementById('endMenu').style.display = 'block';
-      canvas.style.display = 'none';
-    }
+    // High score submission and view
+    document.getElementById('submitScoreButton').addEventListener('click', () => {
+      const name = document.getElementById('playerName').value || "Anonymous";
+      const record = { name: name, skier: game.skier.images === game.assets.skier.ryan ? "Ryan" : 
+                                        (game.skier.images === game.assets.skier.alex ? "Alex" : "Mitch"),
+                                        time: game.elapsedTime };
+      let stageKey;
+      switch(game.currentStage) {
+        case STAGES.STAGE1: stageKey = "STAGE1"; break;
+        case STAGES.STAGE2: stageKey = "STAGE2"; break;
+        case STAGES.STAGE3: stageKey = "STAGE3"; break;
+        case STAGES.STAGE4: stageKey = "STAGE4"; break;
+        case STAGES.BUNNY: stageKey = "BUNNY"; break;
+      }
+      saveHighScore(stageKey, record);
+      displayHighScores(stageKey);
+    });
+    document.getElementById('viewHighScoresButton').addEventListener('click', () => {
+      let stageKey;
+      switch(game.currentStage) {
+        case STAGES.STAGE1: stageKey = "STAGE1"; break;
+        case STAGES.STAGE2: stageKey = "STAGE2"; break;
+        case STAGES.STAGE3: stageKey = "STAGE3"; break;
+        case STAGES.STAGE4: stageKey = "STAGE4"; break;
+        case STAGES.BUNNY: stageKey = "BUNNY"; break;
+      }
+      displayHighScores(stageKey);
+    });
   </script>
 </body>
 </html>
