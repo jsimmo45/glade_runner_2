@@ -5,30 +5,39 @@
   <style>
     body {
       margin: 0;
+      background-color: #f0f0f0;
+      font-family: sans-serif;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      height: 100vh;
-      background-color: #f0f0f0;
     }
     canvas {
-      display: block;
-      background: white;
-      border: 5px solid black;
+      background: #fff;
+      border: 5px solid #333;
+      margin-top: 20px;
+    }
+    /* Improved button styling */
+    button {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 15px 32px;
+      margin: 10px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: background-color 0.3s, transform 0.2s;
+    }
+    button:hover {
+      background-color: #45a049;
+      transform: scale(1.02);
     }
     #menu, #playerSelect, #endMenu, #pauseMenu, #introMovie {
-      display: none;
       text-align: center;
       margin-top: 20px;
     }
-    #startButton, #stage1Button, #stage2Button, #stage3Button, #replayMovieButton,
-    #player1Button, #player2Button, #player3Button {
-      display: block;
-      margin: 20px auto;
-      padding: 20px;
-      font-size: 24px;
-    }
+    /* Arrange player selection images nicely */
     #playerSelect div {
       display: inline-block;
       margin: 0 20px;
@@ -36,24 +45,32 @@
     #playerSelect img {
       width: 100px;
       height: 100px;
+      display: block;
+      margin: 0 auto 10px;
     }
     #timer {
-      text-align: center;
       font-size: 24px;
       margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <!-- Menus and UI -->
+  <!-- Menu UI -->
   <div id="menu">
     <img id="titleImage" src="title-screen.png" alt="Title Screen">
+    <br>
     <button id="viewMovieButton">View Intro Movie</button>
+    <br>
+    <!-- Stage selection buttons -->
     <button id="stage1Button">Stage 1</button>
     <button id="stage2Button">Stage 2</button>
     <button id="stage3Button">Stage 3</button>
+    <button id="stage4Button">Stage 4</button>
   </div>
-  <div id="playerSelect">
+  
+  <!-- Character selection UI -->
+  <div id="playerSelect" style="display:none;">
+    <h2>Select Your Skier</h2>
     <div>
       <img id="ryanRight" src="ryan-right.png" alt="Ryan">
       <button id="player1Button">Ryan</button>
@@ -67,21 +84,26 @@
       <button id="player3Button">Mitch</button>
     </div>
   </div>
-  <div id="pauseMenu">
+  
+  <div id="pauseMenu" style="display:none;">
     <button id="pauseButton">Pause</button>
   </div>
-  <div id="endMenu">
+  
+  <div id="endMenu" style="display:none;">
     <p id="timeTaken"></p>
     <img id="endImage" src="" alt="End Image">
+    <br>
     <button id="restartButton">Restart Game</button>
   </div>
-  <div id="introMovie">
+  
+  <div id="introMovie" style="display:none;">
     <video id="introVideo" width="800" height="600" controls>
       <source src="intro-movie.mp4" type="video/mp4">
       Your browser does not support the video tag.
     </video>
   </div>
-  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  
+  <canvas id="gameCanvas" width="800" height="600" style="display:none;"></canvas>
   <div id="timer">Time: 0 seconds</div>
 
   <!-- Audio Elements -->
@@ -105,7 +127,7 @@
   <script>
     console.log("Script loaded");
 
-    /* ---------------- Constants & Helper Functions ---------------- */
+    /* ---------------- Constants & Helpers ---------------- */
     const GAME_STATES = {
       MENU: 'menu',
       PLAYER_SELECT: 'player_select',
@@ -118,10 +140,11 @@
     const STAGES = {
       STAGE1: 1,
       STAGE2: 2,
-      STAGE3: 3
+      STAGE3: 3,
+      STAGE4: 4
     };
 
-    // Simple collision detection (axis-aligned bounding boxes)
+    // AABB collision check
     function checkCollision(a, b) {
       return a.x < b.x + b.width &&
              a.x + a.width > b.x &&
@@ -129,7 +152,7 @@
              a.y + a.height > b.y;
     }
 
-    // Returns a Promise that resolves when the image is loaded
+    // Load image with Promise
     function loadImage(src) {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -159,36 +182,21 @@
         this.boostActive = false;
         this.boostEndTime = 0;
       }
-
       update(keys, canvasWidth, canvasHeight) {
-        if (keys.ArrowLeft) {
-          this.x -= this.speed;
-          this.direction = 'left';
-        }
-        if (keys.ArrowRight) {
-          this.x += this.speed;
-          this.direction = 'right';
-        }
-        if (keys.ArrowUp) {
-          this.y -= this.speed;
-          this.direction = 'forward';
-        }
-        if (keys.ArrowDown) {
-          this.y += this.speed;
-          this.direction = 'forward';
-        }
-        // Constrain within canvas bounds
+        if (keys.ArrowLeft) { this.x -= this.speed; this.direction = 'left'; }
+        if (keys.ArrowRight) { this.x += this.speed; this.direction = 'right'; }
+        if (keys.ArrowUp) { this.y -= this.speed; this.direction = 'forward'; }
+        if (keys.ArrowDown) { this.y += this.speed; this.direction = 'forward'; }
+        // Constrain within canvas
         this.x = Math.max(0, Math.min(this.x, canvasWidth - this.width));
         this.y = Math.max(0, Math.min(this.y, canvasHeight - this.height));
-
-        // Check boost expiration
+        // Boost expiration
         if (this.boostActive && Date.now() > this.boostEndTime) {
           this.speed = this.baseSpeed;
           this.boostActive = false;
           console.log("Speed boost ended");
         }
       }
-
       draw(ctx) {
         let img;
         if (this.direction === 'left') {
@@ -202,7 +210,6 @@
           ctx.drawImage(img, this.x, this.y, this.width, this.height);
         }
       }
-
       activateBoost(duration) {
         if (!this.boostActive) {
           this.speed *= 1.33;
@@ -222,19 +229,14 @@
         this.image = image;
         this.canvasHeight = canvasHeight;
       }
-
       update(scrollSpeed) {
         this.y -= scrollSpeed;
-        // Recycle the tree when off screen
         if (this.y < -this.height) {
           this.y = this.canvasHeight + Math.random() * this.canvasHeight * 9;
           this.x = Math.random() * (canvas.width - this.width);
         }
       }
-
-      draw(ctx) {
-        ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
-      }
+      draw(ctx) { ctx.drawImage(this.image, this.x, this.y, this.width, this.height); }
     }
 
     class Snowman {
@@ -247,11 +249,7 @@
         this.hit = false;
         this.canvasHeight = canvasHeight;
       }
-
-      update(scrollSpeed) {
-        this.y -= scrollSpeed;
-      }
-
+      update(scrollSpeed) { this.y -= scrollSpeed; }
       draw(ctx) {
         const img = this.hit ? this.images.hit : this.images.intact;
         ctx.drawImage(img, this.x, this.y, this.width, this.height);
@@ -270,24 +268,46 @@
         this.canvasWidth = canvasWidth;
         this.canvasHeight = canvasHeight;
       }
-
       update(skier, stage) {
         if (!this.active) return;
-        // Homing movement: move toward the skier
+        // Occasionally slow down: 5% chance to move at half-speed this frame.
+        let speedFactor = (Math.random() < 0.05) ? 0.5 : 1.0;
+        const effectiveSpeed = this.speed * speedFactor;
         let dx = skier.x - this.x;
         let dy = skier.y - this.y;
         let distance = Math.sqrt(dx * dx + dy * dy) || 1;
-        this.x += (dx / distance) * this.speed;
-        this.y += (dy / distance) * this.speed;
+        this.x += (dx / distance) * effectiveSpeed;
+        this.y += (dy / distance) * effectiveSpeed;
         // Clamp within canvas
         this.x = Math.max(0, Math.min(this.x, this.canvasWidth - this.width));
         this.y = Math.max(0, Math.min(this.y, this.canvasHeight - this.height));
       }
-
       draw(ctx) {
-        if (this.active) {
-          ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+        if (this.active) { ctx.drawImage(this.image, this.x, this.y, this.width, this.height); }
+      }
+    }
+
+    // New obstacle for Stage 4
+    class Boulder {
+      constructor(x, y, radius, speed) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.speed = speed;
+      }
+      update(scrollSpeed) {
+        // Fall downward (plus scroll)
+        this.y += this.speed + scrollSpeed;
+        if (this.y - this.radius > canvas.height) {
+          this.y = -this.radius;
+          this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
         }
+      }
+      draw(ctx) {
+        ctx.fillStyle = 'gray';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
@@ -301,26 +321,20 @@
         this.pauseTime = 0;
         this.startTime = 0;
         this.elapsedTime = 0;
-        this.scrollSpeed = 3; // Background scroll speed
+        this.distance = 0;
+        this.totalDistance = 10 * this.canvas.height; // arbitrary total for progress
         this.keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
-        this.debug = true; // Set to true to enable debugging logs
-        this.lastLogTime = -1;
-
-        // Containers for preloaded assets
-        this.assets = {
-          skier: {},
-          tree: null,
-          murderTree: null,
-          snowman: {}
-        };
-
+        this.collisionEffect = null; // to show "BAM!" on collision
+        // Asset containers
+        this.assets = { skier: {}, tree: null, murderTree: null, snowman: {} };
         // Game objects
         this.skier = null;
         this.trees = [];
         this.snowmen = [];
+        this.boulders = [];  // for Stage 4
         this.murderTree = null;
+        // Finish line (drawn as a checkerboard)
         this.finishLine = { y: -10 * this.canvas.height, width: this.canvas.width, height: 40 };
-
         // Audio references
         this.audio = {
           title: document.getElementById('titleMusic'),
@@ -328,33 +342,25 @@
           stage2: document.getElementById('stage2Music'),
           stage3: document.getElementById('stage3Music')
         };
-
         this.bindInput();
       }
-
       bindInput() {
         document.addEventListener('keydown', (e) => {
-          // Prevent default scrolling with arrow keys
           if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
             e.preventDefault();
           }
           if (this.keys.hasOwnProperty(e.key)) {
             this.keys[e.key] = true;
-          } else if (e.key === 'p') {
-            this.togglePause();
-          }
+          } else if (e.key === 'p') { this.togglePause(); }
         });
-
         document.addEventListener('keyup', (e) => {
           if (this.keys.hasOwnProperty(e.key)) {
             this.keys[e.key] = false;
           }
         });
       }
-
       async preloadAssets() {
         console.log("Preloading assets...");
-        // Preload skier images for each player
         const players = ['ryan', 'alex', 'mitch'];
         for (const name of players) {
           this.assets.skier[name] = {
@@ -364,35 +370,37 @@
           };
           console.log(`Loaded skier images for ${name}`);
         }
-        // Preload tree and murder tree images
         this.assets.tree = await loadImage('tree.png');
         console.log("Loaded tree image");
         this.assets.murderTree = await loadImage('murder-tree.png');
         console.log("Loaded murder tree image");
-        // Preload snowman images
         this.assets.snowman = {
           intact: await loadImage('snowman-intact.png'),
           hit: await loadImage('snowman-hit.png')
         };
         console.log("Loaded snowman images");
       }
-
       initGameObjects(selectedPlayer) {
         console.log("Initializing game objects for player:", selectedPlayer);
-        // Initialize the skier using the chosen character images
-        this.skier = new Skier(this.canvas.width / 2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
-
-        // Initialize trees
-        this.trees = [];
+        // Create the skier
+        this.skier = new Skier(this.canvas.width/2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
+        // Reset progress
+        this.distance = 0;
+        this.finishLine.y = -10 * this.canvas.height;
+        // Clear collision effect
+        this.collisionEffect = null;
+        // Create obstacles based on stage
         if (this.currentStage === STAGES.STAGE1) {
-          // Create 20 randomly placed trees
+          // 20 random trees
+          this.trees = [];
           for (let i = 0; i < 20; i++) {
             const treeX = Math.random() * (this.canvas.width - 60);
             const treeY = Math.random() * this.canvas.height * 10 + this.canvas.height;
             this.trees.push(new Tree(treeX, treeY, 60, 80, this.assets.tree, this.canvas.height));
           }
         } else if (this.currentStage === STAGES.STAGE2) {
-          // Create rows of trees with a gap
+          // Rows of trees with gaps
+          this.trees = [];
           const rows = 10;
           const cols = Math.floor(this.canvas.width / 60);
           for (let i = 0; i < rows; i++) {
@@ -404,9 +412,9 @@
             }
           }
         } else if (this.currentStage === STAGES.STAGE3) {
-          // Create a curving narrow path
+          // Curving narrow path
           this.trees = [];
-          let pathX = this.canvas.width / 2 - 2.5 * this.skier.width;
+          let pathX = this.canvas.width/2 - 2.5 * this.skier.width;
           const rows = 10;
           const cols = Math.floor(this.canvas.width / 60);
           for (let i = 0; i < rows; i++) {
@@ -418,174 +426,187 @@
               }
             }
           }
+        } else if (this.currentStage === STAGES.STAGE4) {
+          // New stage: Falling boulders instead of trees.
+          this.boulders = [];
+          for (let i = 0; i < 10; i++) {
+            let boulderX = Math.random() * (this.canvas.width - 40) + 20;
+            let boulderY = Math.random() * -this.canvas.height; // start above
+            this.boulders.push(new Boulder(boulderX, boulderY, 20, 2));
+          }
         }
-
-        // Initialize snowmen
+        // Create snowmen (always present)
         this.snowmen = [];
         for (let i = 0; i < 3; i++) {
           const snowmanX = Math.random() * (this.canvas.width - 40);
           const snowmanY = Math.random() * this.canvas.height * 10;
           this.snowmen.push(new Snowman(snowmanX, snowmanY, 40, 60, this.assets.snowman, this.canvas.height));
         }
-
-        // Initialize the murder tree
+        // Initialize the murder tree (present in all stages)
         this.murderTree = new MurderTree(
           Math.random() * (this.canvas.width - 45),
           this.canvas.height + 100,
-          45,
-          75,
-          4.5,
+          45, 75, 4.5,
           this.assets.murderTree,
-          this.canvas.width,
-          this.canvas.height
+          this.canvas.width, this.canvas.height
         );
       }
-
       togglePause() {
         if (this.state === GAME_STATES.PLAYING) {
           this.state = GAME_STATES.PAUSED;
           this.pauseStart = Date.now();
           console.log("Game paused");
-          if (this.currentStage === STAGES.STAGE2) {
-            this.audio.stage2.pause();
-          } else if (this.currentStage === STAGES.STAGE3) {
-            this.audio.stage3.pause();
-          } else {
-            this.audio.stage1.pause();
-          }
+          if (this.currentStage === STAGES.STAGE2) { this.audio.stage2.pause(); }
+          else if (this.currentStage === STAGES.STAGE3) { this.audio.stage3.pause(); }
+          else { this.audio.stage1.pause(); }
         } else if (this.state === GAME_STATES.PAUSED) {
           this.state = GAME_STATES.PLAYING;
           this.pauseTime += Date.now() - this.pauseStart;
           console.log("Game resumed");
-          if (this.currentStage === STAGES.STAGE2) {
-            this.audio.stage2.play();
-          } else if (this.currentStage === STAGES.STAGE3) {
-            this.audio.stage3.play();
-          } else {
-            this.audio.stage1.play();
-          }
+          if (this.currentStage === STAGES.STAGE2) { this.audio.stage2.play(); }
+          else if (this.currentStage === STAGES.STAGE3) { this.audio.stage3.play(); }
+          else { this.audio.stage1.play(); }
         }
       }
-
+      // Update positions and collisions (no drawing here)
       update() {
-        if (this.state !== GAME_STATES.PLAYING) return;
-
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Update skier movement
+        // Update skier and finish line
         this.skier.update(this.keys, this.canvas.width, this.canvas.height);
-
-        // Scroll the finish line
         this.finishLine.y -= this.skier.speed / 2;
-
-        // Update and draw trees
-        for (let tree of this.trees) {
-          tree.update(this.skier.speed / 2);
-          if (checkCollision(this.skier, tree)) {
-            console.log("Collision with tree detected");
-            this.state = GAME_STATES.GAME_OVER;
-            showEndMenu(endImages.tree, this.elapsedTime);
-            return;
-          }
-          tree.draw(this.ctx);
-        }
-
-        // Update and draw snowmen; trigger boost on collision
+        this.distance += this.skier.speed;
+        // Update snowmen
         for (let snowman of this.snowmen) {
           snowman.update(this.skier.speed / 2);
           if (!snowman.hit && checkCollision(this.skier, snowman)) {
             console.log("Collision with snowman detected");
             snowman.hit = true;
-            this.skier.activateBoost(3000); // 3-second boost
-          }
-          snowman.draw(this.ctx);
-        }
-
-        // Update elapsed time and display timer
-        this.elapsedTime = Math.floor((Date.now() - this.startTime - this.pauseTime) / 1000);
-        document.getElementById('timer').textContent = `Time: ${this.elapsedTime} seconds`;
-
-        if (this.debug) {
-          // Log once per second
-          if (this.elapsedTime > this.lastLogTime) {
-            console.log("Update tick: elapsed time =", this.elapsedTime, "state =", this.state);
-            this.lastLogTime = this.elapsedTime;
+            this.skier.activateBoost(3000);
           }
         }
-
+        // Update obstacles depending on stage
+        if (this.currentStage !== STAGES.STAGE4) {
+          for (let tree of this.trees) {
+            tree.update(this.skier.speed / 2);
+            if (checkCollision(this.skier, tree)) {
+              console.log("Collision with tree detected");
+              if (!this.collisionEffect) {
+                this.collisionEffect = { x: this.skier.x, y: this.skier.y };
+                setTimeout(() => { showEndMenu(endImages.tree, this.elapsedTime); }, 300);
+              }
+              return;
+            }
+          }
+        } else { // Stage 4: update boulders
+          for (let boulder of this.boulders) {
+            boulder.update(this.skier.speed / 2);
+            // Approximate boulder collision as a box around the circle
+            let boulderBox = { x: boulder.x - boulder.radius, y: boulder.y - boulder.radius, width: boulder.radius * 2, height: boulder.radius * 2 };
+            if (checkCollision(this.skier, boulderBox)) {
+              console.log("Collision with boulder detected");
+              if (!this.collisionEffect) {
+                this.collisionEffect = { x: this.skier.x, y: this.skier.y };
+                setTimeout(() => { showEndMenu(endImages.tree, this.elapsedTime); }, 300);
+              }
+              return;
+            }
+          }
+        }
+        // Update murder tree
+        if (this.murderTree.active) {
+          this.murderTree.update(this.skier, this.currentStage);
+          if (checkCollision(this.skier, this.murderTree)) {
+            console.log("Collision with murder tree detected");
+            if (!this.collisionEffect) {
+              this.collisionEffect = { x: this.skier.x, y: this.skier.y };
+              setTimeout(() => { showEndMenu(endImages.murderTree, this.elapsedTime); }, 300);
+            }
+            return;
+          }
+        }
         // Activate murder tree after 10 seconds
+        this.elapsedTime = Math.floor((Date.now() - this.startTime - this.pauseTime) / 1000);
         if (this.elapsedTime >= 10 && !this.murderTree.active) {
           this.murderTree.active = true;
           this.murderTree.y = (this.currentStage === STAGES.STAGE3) ? -this.murderTree.height : this.canvas.height;
           console.log("Murder tree activated");
         }
-
-        // Update murder tree and check collision
-        if (this.murderTree.active) {
-          this.murderTree.update(this.skier, this.currentStage);
-          if (checkCollision(this.skier, this.murderTree)) {
-            console.log("Collision with murder tree detected");
-            this.state = GAME_STATES.GAME_OVER;
-            showEndMenu(endImages.murderTree, this.elapsedTime);
-            return;
-          }
-          this.murderTree.draw(this.ctx);
-        }
-
-        // Draw the finish line
-        this.drawFinishLine();
-
-        // Draw the skier
-        this.skier.draw(this.ctx);
-
         // Win condition: skier passes finish line
         if (this.skier.y < this.finishLine.y + this.finishLine.height) {
           console.log("Win condition reached");
-          this.state = GAME_STATES.WIN;
           showEndMenu(endImages.finish, this.elapsedTime);
-          return;
+          this.state = GAME_STATES.WIN;
         }
       }
-
-      drawFinishLine() {
-        for (let i = 0; i < this.finishLine.width / 20; i++) {
-          for (let j = 0; j < this.finishLine.height / 20; j++) {
-            this.ctx.fillStyle = (i + j) % 2 === 0 ? 'black' : 'white';
-            this.ctx.fillRect(i * 20, this.finishLine.y + j * 20, 20, 20);
-          }
+      // Draw all objects in proper order
+      drawScene() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawFinishLine();
+        // Draw snowmen (first)
+        for (let snowman of this.snowmen) { snowman.draw(this.ctx); }
+        // Then obstacles: trees OR (for stage 4) boulders
+        if (this.currentStage !== STAGES.STAGE4) {
+          for (let tree of this.trees) { tree.draw(this.ctx); }
+        } else {
+          for (let boulder of this.boulders) { boulder.draw(this.ctx); }
         }
-      }
-
-      render() {
-        // Display speed boost notification
+        // Draw murder tree if active
+        if (this.murderTree.active) { this.murderTree.draw(this.ctx); }
+        // Draw the skier on top
+        this.skier.draw(this.ctx);
+        // Draw progress bar at the top
+        this.drawProgressBar();
+        // If boost is active, show a message
         if (this.skier.boostActive) {
           this.ctx.fillStyle = 'black';
           this.ctx.font = '20px Arial';
           this.ctx.fillText('Speed boost!', this.skier.x, this.skier.y - 10);
         }
-      }
-
-      gameLoop() {
-        if (this.state === GAME_STATES.PLAYING) {
-          this.update();
-          this.render();
+        // If a collision effect is active, draw "BAM!" at collision point
+        if (this.collisionEffect) {
+          this.ctx.fillStyle = 'red';
+          this.ctx.font = '30px Arial';
+          this.ctx.fillText("BAM!", this.collisionEffect.x, this.collisionEffect.y);
         }
+      }
+      drawFinishLine() {
+        for (let i = 0; i < this.finishLine.width / 20; i++) {
+          for (let j = 0; j < this.finishLine.height / 20; j++) {
+            this.ctx.fillStyle = ((i + j) % 2 === 0) ? 'black' : 'white';
+            this.ctx.fillRect(i * 20, this.finishLine.y + j * 20, 20, 20);
+          }
+        }
+      }
+      drawProgressBar() {
+        // Calculate progress as distance traveled over totalDistance
+        let progress = Math.min(1, this.distance / this.totalDistance);
+        const barWidth = this.canvas.width - 20;
+        const barHeight = 20;
+        // Draw background bar
+        this.ctx.fillStyle = '#ddd';
+        this.ctx.fillRect(10, 10, barWidth, barHeight);
+        // Draw progress portion
+        this.ctx.fillStyle = '#4CAF50';
+        this.ctx.fillRect(10, 10, barWidth * progress, barHeight);
+        // Draw border
+        this.ctx.strokeStyle = '#333';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(10, 10, barWidth, barHeight);
+      }
+      // Main game loop: update (if playing) then draw scene
+      gameLoop() {
+        if (this.state === GAME_STATES.PLAYING) { this.update(); }
+        this.drawScene();
+        // Update timer display
+        document.getElementById('timer').textContent = `Time: ${this.elapsedTime} seconds`;
         requestAnimationFrame(this.gameLoop.bind(this));
       }
-
       startGame(selectedPlayer) {
         console.log("Starting game for player:", selectedPlayer);
-        // Switch audio from title to the stage music (add fade transitions if desired)
+        // Switch audio from title to stage music
         this.audio.title.pause();
-        if (this.currentStage === STAGES.STAGE2) {
-          this.audio.stage2.play();
-        } else if (this.currentStage === STAGES.STAGE3) {
-          this.audio.stage3.play();
-        } else {
-          this.audio.stage1.play();
-        }
-        document.getElementById('menu').style.display = 'none';
-        document.getElementById('playerSelect').style.display = 'none';
+        if (this.currentStage === STAGES.STAGE2) { this.audio.stage2.play(); }
+        else if (this.currentStage === STAGES.STAGE3) { this.audio.stage3.play(); }
+        else { this.audio.stage1.play(); }
         document.getElementById('pauseMenu').style.display = 'block';
         this.startTime = Date.now();
         this.state = GAME_STATES.PLAYING;
@@ -601,18 +622,15 @@
       murderTree: 'murder-tree-caught.jpg',
       finish: 'stage-finished.jpg'
     };
-
     const game = new Game(canvas, ctx);
 
-    // Preload all assets, then show the menu
+    // Preload assets then show the menu
     game.preloadAssets().then(() => {
       console.log("All assets loaded. Displaying menu.");
       document.getElementById('menu').style.display = 'block';
       canvas.style.display = 'none';
       game.audio.title.play();
-    }).catch(err => {
-      console.error('Error loading assets', err);
-    });
+    }).catch(err => { console.error('Error loading assets', err); });
 
     /* ---------------- UI Event Listeners ---------------- */
     document.getElementById('viewMovieButton').addEventListener('click', () => {
@@ -622,63 +640,68 @@
       game.audio.title.play();
       document.getElementById('introVideo').play();
     });
-
     document.getElementById('introVideo').addEventListener('ended', () => {
       console.log("Intro video ended");
       document.getElementById('introMovie').style.display = 'none';
       document.getElementById('menu').style.display = 'block';
     });
-
+    // When a stage button is clicked, hide the menu and show character selection.
     document.getElementById('stage1Button').addEventListener('click', () => {
       console.log("Stage 1 button clicked");
       game.currentStage = STAGES.STAGE1;
+      document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
-
     document.getElementById('stage2Button').addEventListener('click', () => {
       console.log("Stage 2 button clicked");
       game.currentStage = STAGES.STAGE2;
+      document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
-
     document.getElementById('stage3Button').addEventListener('click', () => {
       console.log("Stage 3 button clicked");
       game.currentStage = STAGES.STAGE3;
+      document.getElementById('menu').style.display = 'none';
       document.getElementById('playerSelect').style.display = 'block';
     });
-
+    document.getElementById('stage4Button').addEventListener('click', () => {
+      console.log("Stage 4 button clicked");
+      game.currentStage = STAGES.STAGE4;
+      document.getElementById('menu').style.display = 'none';
+      document.getElementById('playerSelect').style.display = 'block';
+    });
+    // Character selection buttons
     document.getElementById('player1Button').addEventListener('click', () => {
       console.log("Player Ryan selected");
       canvas.style.display = 'block';
+      document.getElementById('playerSelect').style.display = 'none';
       game.initGameObjects('ryan');
       game.startGame('ryan');
     });
-
     document.getElementById('player2Button').addEventListener('click', () => {
       console.log("Player Alex selected");
       canvas.style.display = 'block';
+      document.getElementById('playerSelect').style.display = 'none';
       game.initGameObjects('alex');
       game.startGame('alex');
     });
-
     document.getElementById('player3Button').addEventListener('click', () => {
       console.log("Player Mitch selected");
       canvas.style.display = 'block';
+      document.getElementById('playerSelect').style.display = 'none';
       game.initGameObjects('mitch');
       game.startGame('mitch');
     });
-
     document.getElementById('pauseButton').addEventListener('click', () => {
       console.log("Pause button clicked");
       game.togglePause();
     });
-
     document.getElementById('restartButton').addEventListener('click', () => {
       console.log("Restart button clicked");
       location.reload();
     });
 
-    // Function to show end screen with appropriate image and time taken
+    // End screen function
     function showEndMenu(imageSrc, elapsedTime) {
       console.log("Showing end menu:", imageSrc, "Elapsed time:", elapsedTime);
       document.getElementById('endImage').src = imageSrc;
