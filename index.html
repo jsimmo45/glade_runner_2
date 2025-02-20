@@ -9,7 +9,7 @@
       font-family: sans-serif;
       text-align: center;
     }
-    /* Progress bar container (placed above the play area) */
+    /* Progress bar container above the play area */
     #progressContainer {
       width: 1600px;
       height: 20px;
@@ -54,7 +54,7 @@
       text-align: center;
       margin-top: 20px;
     }
-    /* Character selection: show each skier with stats on separate rows */
+    /* Character selection: bigger stats (one row per stat) */
     #playerSelect div {
       display: inline-block;
       margin: 0 20px;
@@ -125,7 +125,7 @@
     <button id="backToMenuFromSoundtrack">Back to Menu</button>
   </div>
   
-  <!-- Character Selection (with four skiers) -->
+  <!-- Character Selection -->
   <div id="playerSelect" style="display:none;">
     <h2>Select Your Skier</h2>
     <div>
@@ -183,7 +183,7 @@
     </video>
   </div>
   
-  <!-- Progress bar (above play area) -->
+  <!-- Progress bar above play area -->
   <div id="progressContainer" style="display:none;">
     <div id="progressBar"></div>
   </div>
@@ -213,7 +213,6 @@
   <script>
     console.log("Script loaded");
 
-    // Canvas dimensions
     const cw = 1600, ch = 1200;
 
     /* ---------------- Character Stats ---------------- */
@@ -224,7 +223,7 @@
       jeremy: { speedMultiplier: 2.0, stamina: 2, steeze: 2 }
     };
 
-    /* ---------------- Additional Game States ---------------- */
+    /* ---------------- Game States & Stage IDs ---------------- */
     const GAME_STATES = {
       MENU: 'menu',
       PLAYER_SELECT: 'player_select',
@@ -235,7 +234,6 @@
       WIN: 'win'
     };
 
-    // Stage IDs – note: we now add a new stage "Serpentine Slalom"
     const STAGES = {
       STAGE1: 1,
       STAGE2: 2,
@@ -253,23 +251,17 @@
              a.y + a.height > b.y;
     }
 
-    // Load an image and return a Promise
+    // Load image via Promise
     function loadImage(src) {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => {
-          console.log(`Loaded image: ${src}`);
-          resolve(img);
-        };
-        img.onerror = () => {
-          console.error(`Error loading image: ${src}`);
-          reject();
-        };
+        img.onload = () => { console.log(`Loaded image: ${src}`); resolve(img); };
+        img.onerror = () => { console.error(`Error loading image: ${src}`); reject(); };
         img.src = src;
       });
     }
 
-    /* ---------------- SnowFlake (for Stage 2) ---------------- */
+    /* ---------------- SnowFlake (Stage 2) ---------------- */
     class SnowFlake {
       constructor(x, y, size, speed, drift) {
         this.x = x;
@@ -281,10 +273,7 @@
       update() {
         this.y += this.speed;
         this.x += this.drift;
-        if (this.y > ch) {
-          this.y = -this.size;
-          this.x = Math.random() * cw;
-        }
+        if (this.y > ch) { this.y = -this.size; this.x = Math.random() * cw; }
         if (this.x > cw) { this.x = 0; }
         if (this.x < 0) { this.x = cw; }
       }
@@ -340,7 +329,7 @@
         }
       }
       activateBoost() {
-        let duration = this.steeze * 1000; // boost lasts steeze seconds
+        let duration = this.steeze * 1000;
         if (!this.boostActive) {
           this.speed *= 1.33;
           this.boostActive = true;
@@ -449,24 +438,17 @@
       }
     }
 
-    /* ---------------- New Stage: Serpentine Slalom ---------------- */
-    // In this stage, trees form a serpentine (zigzag) path ~300px wide (10× skier width).
+    /* ---------------- New Function: Create Serpentine Path ---------------- */
     function createSerpentinePath(game) {
-      const pathWidth = 300; // 10× skier width (approx)
-      const rows = 20; // how many rows of trees to fill the course
       let trees = [];
-      // For each row, compute a center that oscillates
-      for (let i = 0; i < rows; i++) {
-        // Let center vary sinusoidally across the course
-        let center = cw/2 + (cw/2 - pathWidth/2 - 20) * Math.sin( (i/rows) * Math.PI * 2 );
-        // For each column, if the tree is outside the gap (center ± pathWidth/2), add it.
-        const cols = Math.floor(cw / 60);
-        for (let j = 0; j < cols; j++) {
-          let treeX = j * 60;
-          // If treeX is outside the gap, add a tree at this row.
-          if (treeX < center - pathWidth/2 || treeX > center + pathWidth/2) {
-            let treeY = ch + (i * ( (ch*10) / rows )); // spread trees along the course
-            trees.push(new Tree(treeX, treeY, 60, 100, game.assets.tree));
+      const pathWidth = 300; // gap width
+      // Use a vertical spacing of 100 pixels
+      for (let y = ch; y < game.totalDistance; y += 100) {
+        // Oscillate the center more dramatically.
+        let center = cw/2 + (cw/2 - pathWidth/2 - 20) * Math.sin((y / game.totalDistance) * Math.PI * 4);
+        for (let x = 0; x < cw; x += 60) {
+          if (x < center - pathWidth/2 || x > center + pathWidth/2) {
+            trees.push(new Tree(x, y, 60, 100, game.assets.tree));
           }
         }
       }
@@ -498,7 +480,7 @@
         this.boulders = []; // for Stage 4
         this.murderTree = null;
         this.jump = null;   // for Bunny Slope Blitz
-        this.snowflakes = []; // for falling snow in Stage 2
+        this.snowflakes = []; // for Stage 2
         // Finish line (checkerboard)
         this.finishLine = { y: -this.totalDistance, width: cw, height: 40 };
         // Audio references
@@ -550,9 +532,9 @@
       }
       initGameObjects(selectedPlayer) {
         console.log("Initializing game objects for player:", selectedPlayer);
-        // Create the skier; position near top center.
+        // Create the skier near the top center.
         this.skier = new Skier(cw/2 - 20, 100, 30, 60, this.assets.skier[selectedPlayer]);
-        // Set stats based on characterStats.
+        // Set stats from characterStats.
         this.skier.baseSpeed = 6 * characterStats[selectedPlayer].speedMultiplier;
         this.skier.speed = this.skier.baseSpeed;
         this.skier.stamina = characterStats[selectedPlayer].stamina;
@@ -560,7 +542,6 @@
         this.skier.lastHitTime = 0;
         this.distance = 0;
         this.collisionEffect = null;
-        // Set course length
         if (this.currentStage === STAGES.BUNNY) {
           this.totalDistance = 3 * ch;
           this.finishLine.y = -this.totalDistance;
@@ -590,7 +571,6 @@
             }
           }
           this.murderTree = new MurderTree(Math.random() * (cw - 45), ch + 100, 45, 75, 4.5, this.assets.murderTree);
-          // Increase snow density
           this.snowflakes = [];
           for (let i = 0; i < 67; i++) {
             let x = Math.random() * cw;
@@ -637,7 +617,6 @@
           this.murderTree = null;
           this.jump = new Jump(cw/2 - 50, this.finishLine.y + 50, 100, 20);
         } else if (this.currentStage === STAGES.SERPENTINE) {  // Serpentine Slalom
-          // Create a serpentine path that is ~300px wide (10× skier width)
           this.trees = createSerpentinePath(this);
           this.murderTree = null;
         }
@@ -649,10 +628,10 @@
           this.snowmen.push(new Snowman(snowmanX, snowmanY, 40, 60, this.assets.snowman));
         }
       }
-      // Process a hit – reduce stamina and show "BAM!" for 1 sec, then clear.
+      // Process a hit: reduce stamina, show "BAM!" for 1 sec, then clear.
       processHit(obstacleImage) {
         const now = Date.now();
-        const cooldown = 1000; // 1 second invulnerability window
+        const cooldown = 1000;
         if (now - this.skier.lastHitTime > cooldown) {
           if (this.skier.stamina > 1) {
             this.skier.stamina -= 1;
@@ -683,16 +662,18 @@
           else { this.audio.stage1.play(); }
         }
       }
-      // Intro animation: skier skis down with zigzag until reaching near bottom.
+      // Intro animation: skier moves from its initial position to halfway down.
       updateIntro() {
         let t = (Date.now() - this.introStartTime) / 1000; // seconds elapsed
         const totalIntro = 5; // 5-second intro
-        // Use sine wave for horizontal zigzag; amplitude 200.
-        let amplitude = 200;
-        this.skier.x = this.introInitialX + amplitude * Math.sin(2 * Math.PI * t / 2);
-        // Move from initial y to near bottom (say, 80% of ch)
-        this.skier.y = this.introInitialY + ((ch - this.skier.height - this.introInitialY) * (t / totalIntro));
+        const targetY = ch / 2; // halfway down
+        this.skier.x = this.introInitialX + 200 * Math.sin(2 * Math.PI * t / 2);
+        this.skier.y = this.introInitialY + ((targetY - this.introInitialY) * (t / totalIntro));
         if (t >= totalIntro) {
+          // Reset timer so gameplay time doesn't include intro.
+          this.startTime = Date.now();
+          this.pauseTime = 0;
+          this.elapsedTime = 0;
           this.state = GAME_STATES.PLAYING;
         }
       }
@@ -728,7 +709,7 @@
         } else if (this.currentStage === STAGES.STAGE4) {
           for (let boulder of this.boulders) {
             boulder.update(this.skier.speed / 2);
-            let box = { x: boulder.x - boulder.radius, y: boulder.y - boulder.radius, width: boulder.radius*2, height: boulder.radius*2 };
+            let box = { x: boulder.x - boulder.radius, y: boulder.y - boulder.radius, width: boulder.radius * 2, height: boulder.radius * 2 };
             if (checkCollision(this.skier, box)) {
               console.log("Collision with boulder detected");
               this.processHit(endImages.tree);
@@ -759,11 +740,9 @@
             return;
           }
         }
-        // Update falling snow in Stage 2.
         if (this.currentStage === STAGES.STAGE2 && this.snowflakes) {
           for (let flake of this.snowflakes) { flake.update(); }
         }
-        // Update murder tree if active.
         if (this.murderTree && this.murderTree.active) {
           this.murderTree.update(this.skier);
           if (checkCollision(this.skier, this.murderTree)) {
@@ -772,14 +751,12 @@
             if (this.state === GAME_STATES.GAME_OVER) return;
           }
         }
-        // Activate murder tree after 10 seconds.
         this.elapsedTime = Math.floor((Date.now() - this.startTime - this.pauseTime) / 1000);
         if (this.elapsedTime >= 10 && this.murderTree && !this.murderTree.active) {
           this.murderTree.active = true;
           this.murderTree.y = (this.currentStage === STAGES.STAGE3) ? -this.murderTree.height : ch;
           console.log("Murder tree activated");
         }
-        // Win condition: when distance reaches totalDistance (except Bunny stage).
         if (this.distance >= this.totalDistance && this.currentStage !== STAGES.BUNNY) {
           console.log("Win condition reached");
           this.state = GAME_STATES.WIN;
@@ -839,14 +816,13 @@
       }
       startGame(selectedPlayer) {
         console.log("Starting game for player:", selectedPlayer);
-        // Show progress bar container
         document.getElementById('progressContainer').style.display = 'block';
         this.audio.title.pause();
         if (this.currentStage === STAGES.STAGE2) { this.audio.stage2.play(); }
         else if (this.currentStage === STAGES.STAGE3) { this.audio.stage3.play(); }
         else { this.audio.stage1.play(); }
         document.getElementById('pauseMenu').style.display = 'block';
-        // Set up intro animation: record initial position and time.
+        // Start intro animation: skier moves to halfway down.
         this.introStartTime = Date.now();
         this.introInitialX = this.skier.x;
         this.introInitialY = this.skier.y;
